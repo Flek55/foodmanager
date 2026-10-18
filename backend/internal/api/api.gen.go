@@ -72,6 +72,74 @@ func (e Role) Valid() bool {
 	}
 }
 
+// Defines values for Unit.
+const (
+	G    Unit = "g"
+	Kg   Unit = "kg"
+	L    Unit = "l"
+	Ml   Unit = "ml"
+	Pack Unit = "pack"
+	Pcs  Unit = "pcs"
+)
+
+// Valid indicates whether the value is a known member of the Unit enum.
+func (e Unit) Valid() bool {
+	switch e {
+	case G:
+		return true
+	case Kg:
+		return true
+	case L:
+		return true
+	case Ml:
+		return true
+	case Pack:
+		return true
+	case Pcs:
+		return true
+	default:
+		return false
+	}
+}
+
+// AddItemRequest defines model for AddItemRequest.
+type AddItemRequest struct {
+	// CategoryId Явная категория товара; без неё у нового товара категория угадывается
+	CategoryId *openapi_types.UUID `json:"categoryId,omitempty"`
+
+	// Id Id новой позиции, сгенерированный клиентом (необязателен)
+	Id       *openapi_types.UUID `json:"id,omitempty"`
+	Name     string              `json:"name"`
+	Note     *string             `json:"note,omitempty"`
+	Quantity *float64            `json:"quantity,omitempty"`
+	StoreId  *openapi_types.UUID `json:"storeId,omitempty"`
+
+	// Unit Единица количества: штуки, килограммы, граммы, литры, миллилитры, упаковки
+	Unit *Unit `json:"unit,omitempty"`
+}
+
+// Category defines model for Category.
+type Category struct {
+	Emoji *string            `json:"emoji,omitempty"`
+	Id    openapi_types.UUID `json:"id"`
+
+	// Key Ключ встроенной категории (dairy, produce, ...), у своих категорий отсутствует
+	Key       *string `json:"key,omitempty"`
+	Name      string  `json:"name"`
+	SortOrder int     `json:"sortOrder"`
+}
+
+// CategoryInput defines model for CategoryInput.
+type CategoryInput struct {
+	Emoji *string `json:"emoji,omitempty"`
+	Name  string  `json:"name"`
+}
+
+// ClearCheckedResult defines model for ClearCheckedResult.
+type ClearCheckedResult struct {
+	Removed int `json:"removed"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	// Code Машиночитаемый код ошибки
@@ -148,6 +216,39 @@ type InvitePreview struct {
 	MemberCount   int    `json:"memberCount"`
 }
 
+// ListItem defines model for ListItem.
+type ListItem struct {
+	// AddedBy Имя того, кто добавил
+	AddedBy    *string             `json:"addedBy,omitempty"`
+	CategoryId *openapi_types.UUID `json:"categoryId,omitempty"`
+
+	// CheckedAt Когда отметили купленным; отсутствует, если ещё не куплено
+	CheckedAt *time.Time `json:"checkedAt,omitempty"`
+
+	// CheckedBy Имя того, кто отметил купленным
+	CheckedBy   *string             `json:"checkedBy,omitempty"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	Description *string             `json:"description,omitempty"`
+	Id          openapi_types.UUID  `json:"id"`
+	Name        string              `json:"name"`
+	Note        *string             `json:"note,omitempty"`
+	ProductId   openapi_types.UUID  `json:"productId"`
+	Quantity    *float64            `json:"quantity,omitempty"`
+	StoreId     *openapi_types.UUID `json:"storeId,omitempty"`
+
+	// Unit Единица количества: штуки, килограммы, граммы, литры, миллилитры, упаковки
+	Unit *Unit `json:"unit,omitempty"`
+}
+
+// ListSnapshot defines model for ListSnapshot.
+type ListSnapshot struct {
+	Categories []Category `json:"categories"`
+	Items      []ListItem `json:"items"`
+	Products   []Product  `json:"products"`
+	Stores     []Store    `json:"stores"`
+	Version    int64      `json:"version"`
+}
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Email    string `json:"email"`
@@ -169,6 +270,21 @@ type Member struct {
 	UserId      openapi_types.UUID `json:"userId"`
 }
 
+// Product defines model for Product.
+type Product struct {
+	CategoryId     *openapi_types.UUID `json:"categoryId,omitempty"`
+	DefaultStoreId *openapi_types.UUID `json:"defaultStoreId,omitempty"`
+
+	// DefaultUnit Единица количества: штуки, килограммы, граммы, литры, миллилитры, упаковки
+	DefaultUnit *Unit              `json:"defaultUnit,omitempty"`
+	Description *string            `json:"description,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+	Name        string             `json:"name"`
+
+	// UseCount Сколько раз товар добавляли в список (для сортировки подсказок)
+	UseCount int `json:"useCount"`
+}
+
 // RegisterRequest defines model for RegisterRequest.
 type RegisterRequest struct {
 	DisplayName string `json:"displayName"`
@@ -176,8 +292,47 @@ type RegisterRequest struct {
 	Password    string `json:"password"`
 }
 
+// ReorderRequest defines model for ReorderRequest.
+type ReorderRequest struct {
+	// Ids Id всех категорий семьи в нужном порядке
+	Ids []openapi_types.UUID `json:"ids"`
+}
+
 // Role defines model for Role.
 type Role string
+
+// SetCheckedRequest defines model for SetCheckedRequest.
+type SetCheckedRequest struct {
+	Checked bool `json:"checked"`
+}
+
+// Store defines model for Store.
+type Store struct {
+	Id        openapi_types.UUID `json:"id"`
+	Name      string             `json:"name"`
+	SortOrder int                `json:"sortOrder"`
+}
+
+// StoreInput defines model for StoreInput.
+type StoreInput struct {
+	Name string `json:"name"`
+}
+
+// Unit Единица количества: штуки, килограммы, граммы, литры, миллилитры, упаковки
+type Unit string
+
+// UpdateItemRequest defines model for UpdateItemRequest.
+type UpdateItemRequest struct {
+	CategoryId  *openapi_types.UUID `json:"categoryId,omitempty"`
+	Description *string             `json:"description,omitempty"`
+	Name        string              `json:"name"`
+	Note        *string             `json:"note,omitempty"`
+	Quantity    *float64            `json:"quantity,omitempty"`
+	StoreId     *openapi_types.UUID `json:"storeId,omitempty"`
+
+	// Unit Единица количества: штуки, килограммы, граммы, литры, миллилитры, упаковки
+	Unit *Unit `json:"unit,omitempty"`
+}
 
 // User defines model for User.
 type User struct {
@@ -192,6 +347,9 @@ type HouseholdId = openapi_types.UUID
 
 // InviteCode Example: K7QM-2XPA
 type InviteCode = string
+
+// ItemId defines model for ItemId.
+type ItemId = openapi_types.UUID
 
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
@@ -223,8 +381,32 @@ type CreateHouseholdJSONRequestBody = HouseholdInput
 // UpdateHouseholdJSONRequestBody defines body for UpdateHousehold for application/json ContentType.
 type UpdateHouseholdJSONRequestBody = HouseholdInput
 
+// CreateCategoryJSONRequestBody defines body for CreateCategory for application/json ContentType.
+type CreateCategoryJSONRequestBody = CategoryInput
+
+// ReorderCategoriesJSONRequestBody defines body for ReorderCategories for application/json ContentType.
+type ReorderCategoriesJSONRequestBody = ReorderRequest
+
+// UpdateCategoryJSONRequestBody defines body for UpdateCategory for application/json ContentType.
+type UpdateCategoryJSONRequestBody = CategoryInput
+
 // CreateInviteJSONRequestBody defines body for CreateInvite for application/json ContentType.
 type CreateInviteJSONRequestBody = InviteInput
+
+// AddItemJSONRequestBody defines body for AddItem for application/json ContentType.
+type AddItemJSONRequestBody = AddItemRequest
+
+// UpdateItemJSONRequestBody defines body for UpdateItem for application/json ContentType.
+type UpdateItemJSONRequestBody = UpdateItemRequest
+
+// SetItemCheckedJSONRequestBody defines body for SetItemChecked for application/json ContentType.
+type SetItemCheckedJSONRequestBody = SetCheckedRequest
+
+// CreateStoreJSONRequestBody defines body for CreateStore for application/json ContentType.
+type CreateStoreJSONRequestBody = StoreInput
+
+// UpdateStoreJSONRequestBody defines body for UpdateStore for application/json ContentType.
+type UpdateStoreJSONRequestBody = StoreInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -249,6 +431,18 @@ type ServerInterface interface {
 	// UpdateHousehold Переименовать семью (только владелец)
 	// (PATCH /households/{householdId})
 	UpdateHousehold(w http.ResponseWriter, r *http.Request, householdId HouseholdId)
+	// CreateCategory Добавить категорию (в конец)
+	// (POST /households/{householdId}/categories)
+	CreateCategory(w http.ResponseWriter, r *http.Request, householdId HouseholdId)
+	// ReorderCategories Задать порядок категорий (как отделы идут в магазине)
+	// (PUT /households/{householdId}/categories/order)
+	ReorderCategories(w http.ResponseWriter, r *http.Request, householdId HouseholdId)
+	// DeleteCategory Удалить категорию (товары остаются без категории)
+	// (DELETE /households/{householdId}/categories/{categoryId})
+	DeleteCategory(w http.ResponseWriter, r *http.Request, householdId HouseholdId, categoryId openapi_types.UUID)
+	// UpdateCategory Переименовать категорию или сменить эмодзи
+	// (PUT /households/{householdId}/categories/{categoryId})
+	UpdateCategory(w http.ResponseWriter, r *http.Request, householdId HouseholdId, categoryId openapi_types.UUID)
 	// ListInvites Действующие инвайт-коды семьи
 	// (GET /households/{householdId}/invites)
 	ListInvites(w http.ResponseWriter, r *http.Request, householdId HouseholdId)
@@ -258,9 +452,36 @@ type ServerInterface interface {
 	// RevokeInvite Отозвать инвайт-код
 	// (DELETE /households/{householdId}/invites/{code})
 	RevokeInvite(w http.ResponseWriter, r *http.Request, householdId HouseholdId, code InviteCode)
+	// AddItem Добавить товар в список
+	// (POST /households/{householdId}/items)
+	AddItem(w http.ResponseWriter, r *http.Request, householdId HouseholdId)
+	// ClearCheckedItems Убрать из списка все купленные позиции
+	// (POST /households/{householdId}/items/clear-checked)
+	ClearCheckedItems(w http.ResponseWriter, r *http.Request, householdId HouseholdId)
+	// DeleteItem Удалить позицию из списка
+	// (DELETE /households/{householdId}/items/{itemId})
+	DeleteItem(w http.ResponseWriter, r *http.Request, householdId HouseholdId, itemId ItemId)
+	// UpdateItem Изменить позицию и её товар
+	// (PUT /households/{householdId}/items/{itemId})
+	UpdateItem(w http.ResponseWriter, r *http.Request, householdId HouseholdId, itemId ItemId)
+	// SetItemChecked Отметить позицию купленной или вернуть в список
+	// (PUT /households/{householdId}/items/{itemId}/checked)
+	SetItemChecked(w http.ResponseWriter, r *http.Request, householdId HouseholdId, itemId ItemId)
+	// GetList Всё для экрана списка покупок одним запросом
+	// (GET /households/{householdId}/list)
+	GetList(w http.ResponseWriter, r *http.Request, householdId HouseholdId)
 	// RemoveMember Исключить участника (владелец) или выйти из семьи (сам себя)
 	// (DELETE /households/{householdId}/members/{userId})
 	RemoveMember(w http.ResponseWriter, r *http.Request, householdId HouseholdId, userId openapi_types.UUID)
+	// CreateStore Добавить магазин
+	// (POST /households/{householdId}/stores)
+	CreateStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId)
+	// DeleteStore Удалить магазин (позиции остаются, но без магазина)
+	// (DELETE /households/{householdId}/stores/{storeId})
+	DeleteStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId, storeId openapi_types.UUID)
+	// UpdateStore Переименовать магазин
+	// (PUT /households/{householdId}/stores/{storeId})
+	UpdateStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId, storeId openapi_types.UUID)
 	// PreviewInvite Куда приглашает код (можно без входа)
 	// (GET /invites/{code})
 	PreviewInvite(w http.ResponseWriter, r *http.Request, code InviteCode)
@@ -318,6 +539,30 @@ func (_ Unimplemented) UpdateHousehold(w http.ResponseWriter, r *http.Request, h
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// CreateCategory Добавить категорию (в конец)
+// (POST /households/{householdId}/categories)
+func (_ Unimplemented) CreateCategory(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ReorderCategories Задать порядок категорий (как отделы идут в магазине)
+// (PUT /households/{householdId}/categories/order)
+func (_ Unimplemented) ReorderCategories(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteCategory Удалить категорию (товары остаются без категории)
+// (DELETE /households/{householdId}/categories/{categoryId})
+func (_ Unimplemented) DeleteCategory(w http.ResponseWriter, r *http.Request, householdId HouseholdId, categoryId openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateCategory Переименовать категорию или сменить эмодзи
+// (PUT /households/{householdId}/categories/{categoryId})
+func (_ Unimplemented) UpdateCategory(w http.ResponseWriter, r *http.Request, householdId HouseholdId, categoryId openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ListInvites Действующие инвайт-коды семьи
 // (GET /households/{householdId}/invites)
 func (_ Unimplemented) ListInvites(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
@@ -336,9 +581,63 @@ func (_ Unimplemented) RevokeInvite(w http.ResponseWriter, r *http.Request, hous
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// AddItem Добавить товар в список
+// (POST /households/{householdId}/items)
+func (_ Unimplemented) AddItem(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ClearCheckedItems Убрать из списка все купленные позиции
+// (POST /households/{householdId}/items/clear-checked)
+func (_ Unimplemented) ClearCheckedItems(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteItem Удалить позицию из списка
+// (DELETE /households/{householdId}/items/{itemId})
+func (_ Unimplemented) DeleteItem(w http.ResponseWriter, r *http.Request, householdId HouseholdId, itemId ItemId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateItem Изменить позицию и её товар
+// (PUT /households/{householdId}/items/{itemId})
+func (_ Unimplemented) UpdateItem(w http.ResponseWriter, r *http.Request, householdId HouseholdId, itemId ItemId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SetItemChecked Отметить позицию купленной или вернуть в список
+// (PUT /households/{householdId}/items/{itemId}/checked)
+func (_ Unimplemented) SetItemChecked(w http.ResponseWriter, r *http.Request, householdId HouseholdId, itemId ItemId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetList Всё для экрана списка покупок одним запросом
+// (GET /households/{householdId}/list)
+func (_ Unimplemented) GetList(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // RemoveMember Исключить участника (владелец) или выйти из семьи (сам себя)
 // (DELETE /households/{householdId}/members/{userId})
 func (_ Unimplemented) RemoveMember(w http.ResponseWriter, r *http.Request, householdId HouseholdId, userId openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateStore Добавить магазин
+// (POST /households/{householdId}/stores)
+func (_ Unimplemented) CreateStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteStore Удалить магазин (позиции остаются, но без магазина)
+// (DELETE /households/{householdId}/stores/{storeId})
+func (_ Unimplemented) DeleteStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId, storeId openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateStore Переименовать магазин
+// (PUT /households/{householdId}/stores/{storeId})
+func (_ Unimplemented) UpdateStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId, storeId openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -491,6 +790,128 @@ func (siw *ServerInterfaceWrapper) UpdateHousehold(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// CreateCategory operation middleware
+func (siw *ServerInterfaceWrapper) CreateCategory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCategory(w, r, householdId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReorderCategories operation middleware
+func (siw *ServerInterfaceWrapper) ReorderCategories(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReorderCategories(w, r, householdId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteCategory operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCategory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "categoryId" -------------
+	var categoryId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "categoryId", chi.URLParam(r, "categoryId"), &categoryId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "categoryId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteCategory(w, r, householdId, categoryId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCategory operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCategory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "categoryId" -------------
+	var categoryId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "categoryId", chi.URLParam(r, "categoryId"), &categoryId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "categoryId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCategory(w, r, householdId, categoryId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListInvites operation middleware
 func (siw *ServerInterfaceWrapper) ListInvites(w http.ResponseWriter, r *http.Request) {
 
@@ -578,6 +999,189 @@ func (siw *ServerInterfaceWrapper) RevokeInvite(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// AddItem operation middleware
+func (siw *ServerInterfaceWrapper) AddItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddItem(w, r, householdId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ClearCheckedItems operation middleware
+func (siw *ServerInterfaceWrapper) ClearCheckedItems(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearCheckedItems(w, r, householdId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteItem operation middleware
+func (siw *ServerInterfaceWrapper) DeleteItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId ItemId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteItem(w, r, householdId, itemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateItem operation middleware
+func (siw *ServerInterfaceWrapper) UpdateItem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId ItemId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateItem(w, r, householdId, itemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetItemChecked operation middleware
+func (siw *ServerInterfaceWrapper) SetItemChecked(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "itemId" -------------
+	var itemId ItemId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "itemId", chi.URLParam(r, "itemId"), &itemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "itemId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetItemChecked(w, r, householdId, itemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetList operation middleware
+func (siw *ServerInterfaceWrapper) GetList(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetList(w, r, householdId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RemoveMember operation middleware
 func (siw *ServerInterfaceWrapper) RemoveMember(w http.ResponseWriter, r *http.Request) {
 
@@ -604,6 +1208,102 @@ func (siw *ServerInterfaceWrapper) RemoveMember(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RemoveMember(w, r, householdId, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateStore operation middleware
+func (siw *ServerInterfaceWrapper) CreateStore(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateStore(w, r, householdId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteStore operation middleware
+func (siw *ServerInterfaceWrapper) DeleteStore(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "storeId" -------------
+	var storeId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "storeId", chi.URLParam(r, "storeId"), &storeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "storeId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteStore(w, r, householdId, storeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateStore operation middleware
+func (siw *ServerInterfaceWrapper) UpdateStore(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "storeId" -------------
+	var storeId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "storeId", chi.URLParam(r, "storeId"), &storeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "storeId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateStore(w, r, householdId, storeId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -833,6 +1533,45 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/invites/{code}/accept", wrapper.AcceptInvite)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/households/{householdId}/list", wrapper.GetList)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/households/{householdId}/items", wrapper.AddItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/households/{householdId}/items/clear-checked", wrapper.ClearCheckedItems)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/households/{householdId}/items/{itemId}", wrapper.DeleteItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/households/{householdId}/items/{itemId}", wrapper.UpdateItem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/households/{householdId}/items/{itemId}/checked", wrapper.SetItemChecked)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/households/{householdId}/stores", wrapper.CreateStore)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/households/{householdId}/stores/{storeId}", wrapper.DeleteStore)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/households/{householdId}/stores/{storeId}", wrapper.UpdateStore)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/households/{householdId}/categories", wrapper.CreateCategory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/households/{householdId}/categories/order", wrapper.ReorderCategories)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/households/{householdId}/categories/{categoryId}", wrapper.DeleteCategory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/households/{householdId}/categories/{categoryId}", wrapper.UpdateCategory)
 	})
 
 	return r
@@ -1235,6 +1974,247 @@ func (response UpdateHousehold404JSONResponse) VisitUpdateHouseholdResponse(w ht
 	return err
 }
 
+type CreateCategoryRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+	Body        *CreateCategoryJSONRequestBody
+}
+
+type CreateCategoryResponseObject interface {
+	VisitCreateCategoryResponse(w http.ResponseWriter) error
+}
+
+type CreateCategory201JSONResponse Category
+
+func (response CreateCategory201JSONResponse) VisitCreateCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCategory400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateCategory400JSONResponse) VisitCreateCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCategory401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateCategory401JSONResponse) VisitCreateCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCategory404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateCategory404JSONResponse) VisitCreateCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderCategoriesRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+	Body        *ReorderCategoriesJSONRequestBody
+}
+
+type ReorderCategoriesResponseObject interface {
+	VisitReorderCategoriesResponse(w http.ResponseWriter) error
+}
+
+type ReorderCategories200JSONResponse []Category
+
+func (response ReorderCategories200JSONResponse) VisitReorderCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderCategories400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ReorderCategories400JSONResponse) VisitReorderCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderCategories401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ReorderCategories401JSONResponse) VisitReorderCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReorderCategories404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ReorderCategories404JSONResponse) VisitReorderCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCategoryRequestObject struct {
+	HouseholdId HouseholdId        `json:"householdId"`
+	CategoryId  openapi_types.UUID `json:"categoryId"`
+}
+
+type DeleteCategoryResponseObject interface {
+	VisitDeleteCategoryResponse(w http.ResponseWriter) error
+}
+
+type DeleteCategory204Response struct {
+}
+
+func (response DeleteCategory204Response) VisitDeleteCategoryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteCategory401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteCategory401JSONResponse) VisitDeleteCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCategory404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteCategory404JSONResponse) VisitDeleteCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCategoryRequestObject struct {
+	HouseholdId HouseholdId        `json:"householdId"`
+	CategoryId  openapi_types.UUID `json:"categoryId"`
+	Body        *UpdateCategoryJSONRequestBody
+}
+
+type UpdateCategoryResponseObject interface {
+	VisitUpdateCategoryResponse(w http.ResponseWriter) error
+}
+
+type UpdateCategory200JSONResponse Category
+
+func (response UpdateCategory200JSONResponse) VisitUpdateCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCategory400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateCategory400JSONResponse) VisitUpdateCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCategory401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateCategory401JSONResponse) VisitUpdateCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCategory404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateCategory404JSONResponse) VisitUpdateCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListInvitesRequestObject struct {
 	HouseholdId HouseholdId `json:"householdId"`
 }
@@ -1395,6 +2375,390 @@ func (response RevokeInvite404JSONResponse) VisitRevokeInviteResponse(w http.Res
 	return err
 }
 
+type AddItemRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+	Body        *AddItemJSONRequestBody
+}
+
+type AddItemResponseObject interface {
+	VisitAddItemResponse(w http.ResponseWriter) error
+}
+
+type AddItem200JSONResponse ListItem
+
+func (response AddItem200JSONResponse) VisitAddItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddItem201JSONResponse ListItem
+
+func (response AddItem201JSONResponse) VisitAddItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddItem400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response AddItem400JSONResponse) VisitAddItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddItem401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response AddItem401JSONResponse) VisitAddItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddItem404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response AddItem404JSONResponse) VisitAddItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddItem409JSONResponse struct{ ConflictJSONResponse }
+
+func (response AddItem409JSONResponse) VisitAddItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClearCheckedItemsRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+}
+
+type ClearCheckedItemsResponseObject interface {
+	VisitClearCheckedItemsResponse(w http.ResponseWriter) error
+}
+
+type ClearCheckedItems200JSONResponse ClearCheckedResult
+
+func (response ClearCheckedItems200JSONResponse) VisitClearCheckedItemsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClearCheckedItems401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ClearCheckedItems401JSONResponse) VisitClearCheckedItemsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ClearCheckedItems404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ClearCheckedItems404JSONResponse) VisitClearCheckedItemsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteItemRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+	ItemId      ItemId      `json:"itemId"`
+}
+
+type DeleteItemResponseObject interface {
+	VisitDeleteItemResponse(w http.ResponseWriter) error
+}
+
+type DeleteItem204Response struct {
+}
+
+func (response DeleteItem204Response) VisitDeleteItemResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteItem401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteItem401JSONResponse) VisitDeleteItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteItem404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteItem404JSONResponse) VisitDeleteItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateItemRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+	ItemId      ItemId      `json:"itemId"`
+	Body        *UpdateItemJSONRequestBody
+}
+
+type UpdateItemResponseObject interface {
+	VisitUpdateItemResponse(w http.ResponseWriter) error
+}
+
+type UpdateItem200JSONResponse ListItem
+
+func (response UpdateItem200JSONResponse) VisitUpdateItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateItem400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateItem400JSONResponse) VisitUpdateItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateItem401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateItem401JSONResponse) VisitUpdateItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateItem404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateItem404JSONResponse) VisitUpdateItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateItem409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpdateItem409JSONResponse) VisitUpdateItemResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetItemCheckedRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+	ItemId      ItemId      `json:"itemId"`
+	Body        *SetItemCheckedJSONRequestBody
+}
+
+type SetItemCheckedResponseObject interface {
+	VisitSetItemCheckedResponse(w http.ResponseWriter) error
+}
+
+type SetItemChecked200JSONResponse ListItem
+
+func (response SetItemChecked200JSONResponse) VisitSetItemCheckedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetItemChecked401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response SetItemChecked401JSONResponse) VisitSetItemCheckedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetItemChecked404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SetItemChecked404JSONResponse) VisitSetItemCheckedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetItemChecked409JSONResponse struct{ ConflictJSONResponse }
+
+func (response SetItemChecked409JSONResponse) VisitSetItemCheckedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetListRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+}
+
+type GetListResponseObject interface {
+	VisitGetListResponse(w http.ResponseWriter) error
+}
+
+type GetList200JSONResponse ListSnapshot
+
+func (response GetList200JSONResponse) VisitGetListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetList401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetList401JSONResponse) VisitGetListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetList404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetList404JSONResponse) VisitGetListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RemoveMemberRequestObject struct {
 	HouseholdId HouseholdId        `json:"householdId"`
 	UserId      openapi_types.UUID `json:"userId"`
@@ -1464,6 +2828,182 @@ func (response RemoveMember409JSONResponse) VisitRemoveMemberResponse(w http.Res
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateStoreRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+	Body        *CreateStoreJSONRequestBody
+}
+
+type CreateStoreResponseObject interface {
+	VisitCreateStoreResponse(w http.ResponseWriter) error
+}
+
+type CreateStore201JSONResponse Store
+
+func (response CreateStore201JSONResponse) VisitCreateStoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateStore400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateStore400JSONResponse) VisitCreateStoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateStore401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateStore401JSONResponse) VisitCreateStoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateStore404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateStore404JSONResponse) VisitCreateStoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteStoreRequestObject struct {
+	HouseholdId HouseholdId        `json:"householdId"`
+	StoreId     openapi_types.UUID `json:"storeId"`
+}
+
+type DeleteStoreResponseObject interface {
+	VisitDeleteStoreResponse(w http.ResponseWriter) error
+}
+
+type DeleteStore204Response struct {
+}
+
+func (response DeleteStore204Response) VisitDeleteStoreResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteStore401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response DeleteStore401JSONResponse) VisitDeleteStoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteStore404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteStore404JSONResponse) VisitDeleteStoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateStoreRequestObject struct {
+	HouseholdId HouseholdId        `json:"householdId"`
+	StoreId     openapi_types.UUID `json:"storeId"`
+	Body        *UpdateStoreJSONRequestBody
+}
+
+type UpdateStoreResponseObject interface {
+	VisitUpdateStoreResponse(w http.ResponseWriter) error
+}
+
+type UpdateStore200JSONResponse Store
+
+func (response UpdateStore200JSONResponse) VisitUpdateStoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateStore400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateStore400JSONResponse) VisitUpdateStoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateStore401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateStore401JSONResponse) VisitUpdateStoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateStore404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateStore404JSONResponse) VisitUpdateStoreResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1640,6 +3180,18 @@ type StrictServerInterface interface {
 	// UpdateHousehold Переименовать семью (только владелец)
 	// (PATCH /households/{householdId})
 	UpdateHousehold(ctx context.Context, request UpdateHouseholdRequestObject) (UpdateHouseholdResponseObject, error)
+	// CreateCategory Добавить категорию (в конец)
+	// (POST /households/{householdId}/categories)
+	CreateCategory(ctx context.Context, request CreateCategoryRequestObject) (CreateCategoryResponseObject, error)
+	// ReorderCategories Задать порядок категорий (как отделы идут в магазине)
+	// (PUT /households/{householdId}/categories/order)
+	ReorderCategories(ctx context.Context, request ReorderCategoriesRequestObject) (ReorderCategoriesResponseObject, error)
+	// DeleteCategory Удалить категорию (товары остаются без категории)
+	// (DELETE /households/{householdId}/categories/{categoryId})
+	DeleteCategory(ctx context.Context, request DeleteCategoryRequestObject) (DeleteCategoryResponseObject, error)
+	// UpdateCategory Переименовать категорию или сменить эмодзи
+	// (PUT /households/{householdId}/categories/{categoryId})
+	UpdateCategory(ctx context.Context, request UpdateCategoryRequestObject) (UpdateCategoryResponseObject, error)
 	// ListInvites Действующие инвайт-коды семьи
 	// (GET /households/{householdId}/invites)
 	ListInvites(ctx context.Context, request ListInvitesRequestObject) (ListInvitesResponseObject, error)
@@ -1649,9 +3201,36 @@ type StrictServerInterface interface {
 	// RevokeInvite Отозвать инвайт-код
 	// (DELETE /households/{householdId}/invites/{code})
 	RevokeInvite(ctx context.Context, request RevokeInviteRequestObject) (RevokeInviteResponseObject, error)
+	// AddItem Добавить товар в список
+	// (POST /households/{householdId}/items)
+	AddItem(ctx context.Context, request AddItemRequestObject) (AddItemResponseObject, error)
+	// ClearCheckedItems Убрать из списка все купленные позиции
+	// (POST /households/{householdId}/items/clear-checked)
+	ClearCheckedItems(ctx context.Context, request ClearCheckedItemsRequestObject) (ClearCheckedItemsResponseObject, error)
+	// DeleteItem Удалить позицию из списка
+	// (DELETE /households/{householdId}/items/{itemId})
+	DeleteItem(ctx context.Context, request DeleteItemRequestObject) (DeleteItemResponseObject, error)
+	// UpdateItem Изменить позицию и её товар
+	// (PUT /households/{householdId}/items/{itemId})
+	UpdateItem(ctx context.Context, request UpdateItemRequestObject) (UpdateItemResponseObject, error)
+	// SetItemChecked Отметить позицию купленной или вернуть в список
+	// (PUT /households/{householdId}/items/{itemId}/checked)
+	SetItemChecked(ctx context.Context, request SetItemCheckedRequestObject) (SetItemCheckedResponseObject, error)
+	// GetList Всё для экрана списка покупок одним запросом
+	// (GET /households/{householdId}/list)
+	GetList(ctx context.Context, request GetListRequestObject) (GetListResponseObject, error)
 	// RemoveMember Исключить участника (владелец) или выйти из семьи (сам себя)
 	// (DELETE /households/{householdId}/members/{userId})
 	RemoveMember(ctx context.Context, request RemoveMemberRequestObject) (RemoveMemberResponseObject, error)
+	// CreateStore Добавить магазин
+	// (POST /households/{householdId}/stores)
+	CreateStore(ctx context.Context, request CreateStoreRequestObject) (CreateStoreResponseObject, error)
+	// DeleteStore Удалить магазин (позиции остаются, но без магазина)
+	// (DELETE /households/{householdId}/stores/{storeId})
+	DeleteStore(ctx context.Context, request DeleteStoreRequestObject) (DeleteStoreResponseObject, error)
+	// UpdateStore Переименовать магазин
+	// (PUT /households/{householdId}/stores/{storeId})
+	UpdateStore(ctx context.Context, request UpdateStoreRequestObject) (UpdateStoreResponseObject, error)
 	// PreviewInvite Куда приглашает код (можно без входа)
 	// (GET /invites/{code})
 	PreviewInvite(ctx context.Context, request PreviewInviteRequestObject) (PreviewInviteResponseObject, error)
@@ -1902,6 +3481,133 @@ func (sh *strictHandler) UpdateHousehold(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// CreateCategory operation middleware
+func (sh *strictHandler) CreateCategory(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	var request CreateCategoryRequestObject
+
+	request.HouseholdId = householdId
+
+	var body CreateCategoryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateCategory(ctx, request.(CreateCategoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateCategory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateCategoryResponseObject); ok {
+		if err := validResponse.VisitCreateCategoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReorderCategories operation middleware
+func (sh *strictHandler) ReorderCategories(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	var request ReorderCategoriesRequestObject
+
+	request.HouseholdId = householdId
+
+	var body ReorderCategoriesJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReorderCategories(ctx, request.(ReorderCategoriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReorderCategories")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReorderCategoriesResponseObject); ok {
+		if err := validResponse.VisitReorderCategoriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteCategory operation middleware
+func (sh *strictHandler) DeleteCategory(w http.ResponseWriter, r *http.Request, householdId HouseholdId, categoryId openapi_types.UUID) {
+	var request DeleteCategoryRequestObject
+
+	request.HouseholdId = householdId
+	request.CategoryId = categoryId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteCategory(ctx, request.(DeleteCategoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteCategory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteCategoryResponseObject); ok {
+		if err := validResponse.VisitDeleteCategoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateCategory operation middleware
+func (sh *strictHandler) UpdateCategory(w http.ResponseWriter, r *http.Request, householdId HouseholdId, categoryId openapi_types.UUID) {
+	var request UpdateCategoryRequestObject
+
+	request.HouseholdId = householdId
+	request.CategoryId = categoryId
+
+	var body UpdateCategoryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateCategory(ctx, request.(UpdateCategoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateCategory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateCategoryResponseObject); ok {
+		if err := validResponse.VisitUpdateCategoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListInvites operation middleware
 func (sh *strictHandler) ListInvites(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
 	var request ListInvitesRequestObject
@@ -1991,6 +3697,186 @@ func (sh *strictHandler) RevokeInvite(w http.ResponseWriter, r *http.Request, ho
 	}
 }
 
+// AddItem operation middleware
+func (sh *strictHandler) AddItem(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	var request AddItemRequestObject
+
+	request.HouseholdId = householdId
+
+	var body AddItemJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddItem(ctx, request.(AddItemRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddItem")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddItemResponseObject); ok {
+		if err := validResponse.VisitAddItemResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ClearCheckedItems operation middleware
+func (sh *strictHandler) ClearCheckedItems(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	var request ClearCheckedItemsRequestObject
+
+	request.HouseholdId = householdId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ClearCheckedItems(ctx, request.(ClearCheckedItemsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ClearCheckedItems")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ClearCheckedItemsResponseObject); ok {
+		if err := validResponse.VisitClearCheckedItemsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteItem operation middleware
+func (sh *strictHandler) DeleteItem(w http.ResponseWriter, r *http.Request, householdId HouseholdId, itemId ItemId) {
+	var request DeleteItemRequestObject
+
+	request.HouseholdId = householdId
+	request.ItemId = itemId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteItem(ctx, request.(DeleteItemRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteItem")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteItemResponseObject); ok {
+		if err := validResponse.VisitDeleteItemResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateItem operation middleware
+func (sh *strictHandler) UpdateItem(w http.ResponseWriter, r *http.Request, householdId HouseholdId, itemId ItemId) {
+	var request UpdateItemRequestObject
+
+	request.HouseholdId = householdId
+	request.ItemId = itemId
+
+	var body UpdateItemJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateItem(ctx, request.(UpdateItemRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateItem")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateItemResponseObject); ok {
+		if err := validResponse.VisitUpdateItemResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetItemChecked operation middleware
+func (sh *strictHandler) SetItemChecked(w http.ResponseWriter, r *http.Request, householdId HouseholdId, itemId ItemId) {
+	var request SetItemCheckedRequestObject
+
+	request.HouseholdId = householdId
+	request.ItemId = itemId
+
+	var body SetItemCheckedJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetItemChecked(ctx, request.(SetItemCheckedRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetItemChecked")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetItemCheckedResponseObject); ok {
+		if err := validResponse.VisitSetItemCheckedResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetList operation middleware
+func (sh *strictHandler) GetList(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	var request GetListRequestObject
+
+	request.HouseholdId = householdId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetList(ctx, request.(GetListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetList")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetListResponseObject); ok {
+		if err := validResponse.VisitGetListResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RemoveMember operation middleware
 func (sh *strictHandler) RemoveMember(w http.ResponseWriter, r *http.Request, householdId HouseholdId, userId openapi_types.UUID) {
 	var request RemoveMemberRequestObject
@@ -2011,6 +3897,100 @@ func (sh *strictHandler) RemoveMember(w http.ResponseWriter, r *http.Request, ho
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RemoveMemberResponseObject); ok {
 		if err := validResponse.VisitRemoveMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateStore operation middleware
+func (sh *strictHandler) CreateStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	var request CreateStoreRequestObject
+
+	request.HouseholdId = householdId
+
+	var body CreateStoreJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateStore(ctx, request.(CreateStoreRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateStore")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateStoreResponseObject); ok {
+		if err := validResponse.VisitCreateStoreResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteStore operation middleware
+func (sh *strictHandler) DeleteStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId, storeId openapi_types.UUID) {
+	var request DeleteStoreRequestObject
+
+	request.HouseholdId = householdId
+	request.StoreId = storeId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteStore(ctx, request.(DeleteStoreRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteStore")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteStoreResponseObject); ok {
+		if err := validResponse.VisitDeleteStoreResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateStore operation middleware
+func (sh *strictHandler) UpdateStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId, storeId openapi_types.UUID) {
+	var request UpdateStoreRequestObject
+
+	request.HouseholdId = householdId
+	request.StoreId = storeId
+
+	var body UpdateStoreJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateStore(ctx, request.(UpdateStoreRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateStore")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateStoreResponseObject); ok {
+		if err := validResponse.VisitUpdateStoreResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

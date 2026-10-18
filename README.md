@@ -52,6 +52,8 @@ backend/
   internal/apperr/        доменные ошибки (код + сообщение) → HTTP-статусы
   internal/auth/          пароли (argon2id), сессии
   internal/household/     семьи, участники, инвайт-коды
+  internal/shopping/      список, товары, категории (+ угадывание), магазины
+  internal/events/        хаб событий для SSE
   internal/httpapi/       роутер, middleware, хендлеры
   internal/config/        настройки из env
   internal/db/            пул соединений, миграции

@@ -15,8 +15,10 @@ import (
 	"foodmanager/internal/auth"
 	"foodmanager/internal/config"
 	"foodmanager/internal/db"
+	"foodmanager/internal/events"
 	"foodmanager/internal/household"
 	"foodmanager/internal/httpapi"
+	"foodmanager/internal/shopping"
 	"foodmanager/internal/store"
 )
 
@@ -51,11 +53,14 @@ func run() error {
 		return err
 	}
 
+	hub := events.NewHub()
 	authSvc := auth.NewService(store.New(pool))
 	handler := httpapi.NewHandler(httpapi.Deps{
 		DB:           pool,
 		Auth:         authSvc,
-		Households:   household.NewService(pool),
+		Households:   household.NewService(pool, hub),
+		Shopping:     shopping.NewService(pool, hub),
+		Hub:          hub,
 		SecureCookie: cfg.IsProd(),
 		Version:      version,
 	})

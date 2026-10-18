@@ -17,6 +17,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"foodmanager/internal/apperr"
+	"foodmanager/internal/events"
+	"foodmanager/internal/shopping"
 	"foodmanager/internal/store"
 )
 
@@ -41,10 +43,16 @@ var (
 type Service struct {
 	pool *pgxpool.Pool
 	q    *store.Queries
+	pub  events.Publisher
 }
 
-func NewService(pool *pgxpool.Pool) *Service {
-	return &Service{pool: pool, q: store.New(pool)}
+func NewService(pool *pgxpool.Pool, pub events.Publisher) *Service {
+	return &Service{pool: pool, q: store.New(pool), pub: pub}
+}
+
+// notify tells open clients that the household's name or members changed.
+func (s *Service) notify(householdID uuid.UUID) {
+	s.pub.Publish(householdID, events.Event{Kind: events.KindHousehold})
 }
 
 // Detail is a household as seen by one of its members.
@@ -80,8 +88,14 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, name string) (De
 			return err
 		}
 		id = h.ID
-		_, err = q.AddMember(ctx, store.AddMemberParams{HouseholdID: h.ID, UserID: userID, Role: RoleOwner})
-		return err
+		if _, err = q.AddMember(ctx, store.AddMemberParams{HouseholdID: h.ID, UserID: userID, Role: RoleOwner}); err != nil {
+			return err
+		}
+		version, err := q.BumpHouseholdVersion(ctx, h.ID)
+		if err != nil {
+			return err
+		}
+		return shopping.SeedCategories(ctx, q, h.ID, version)
 	})
 	if err != nil {
 		return Detail{}, err
@@ -108,6 +122,7 @@ func (s *Service) Rename(ctx context.Context, userID, householdID uuid.UUID, nam
 	if err := s.q.RenameHousehold(ctx, store.RenameHouseholdParams{ID: householdID, Name: name}); err != nil {
 		return Detail{}, err
 	}
+	s.notify(householdID)
 	return s.Get(ctx, userID, householdID)
 }
 
@@ -116,6 +131,14 @@ func (s *Service) Rename(ctx context.Context, userID, householdID uuid.UUID, nam
 // leaves, ownership passes to the longest-standing member; when the last
 // member leaves, the household is deleted.
 func (s *Service) RemoveMember(ctx context.Context, actorID, householdID, targetID uuid.UUID) error {
+	err := s.removeMember(ctx, actorID, householdID, targetID)
+	if err == nil {
+		s.notify(householdID)
+	}
+	return err
+}
+
+func (s *Service) removeMember(ctx context.Context, actorID, householdID, targetID uuid.UUID) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.q.WithTx(tx)
 		if _, err := q.LockHousehold(ctx, householdID); err != nil {
@@ -242,6 +265,7 @@ func (s *Service) PreviewInvite(ctx context.Context, code string) (store.GetInvi
 // a household you're already in is a no-op and doesn't consume a use.
 func (s *Service) AcceptInvite(ctx context.Context, userID uuid.UUID, code string) (Detail, error) {
 	var householdID uuid.UUID
+	var joined bool
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.q.WithTx(tx)
 		inv, err := q.GetActiveInviteForUpdate(ctx, NormalizeInviteCode(code))
@@ -270,10 +294,14 @@ func (s *Service) AcceptInvite(ctx context.Context, userID uuid.UUID, code strin
 		if int(counts.Members) >= maxHouseholdMember {
 			return apperr.Conflict("household_full", "в семье уже максимальное число участников")
 		}
+		joined = true
 		return q.IncrementInviteUses(ctx, inv.Code)
 	})
 	if err != nil {
 		return Detail{}, err
+	}
+	if joined {
+		s.notify(householdID)
 	}
 	return s.Get(ctx, userID, householdID)
 }

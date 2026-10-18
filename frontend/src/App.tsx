@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router";
 import { AppShell } from "./components/AppShell";
 import { AuthGate } from "./components/AuthGate";
 import { AuthPage } from "./pages/AuthPage";
+import { CatalogPage } from "./pages/CatalogPage";
 import { FamilyPage } from "./pages/FamilyPage";
 import { JoinPage } from "./pages/JoinPage";
 import { ListPage } from "./pages/ListPage";
@@ -24,6 +25,7 @@ export function App() {
         <Route element={<AppShell />}>
           <Route index element={<ListPage />} />
           <Route path="/family" element={<FamilyPage />} />
+          <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>

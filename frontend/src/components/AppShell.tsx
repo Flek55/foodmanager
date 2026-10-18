@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate, useOutletContext } from "react-router";
 import type { Schemas } from "../api/client";
 import { useCurrentHousehold } from "../lib/currentHousehold";
+import { useHouseholdEvents } from "../lib/events";
+import { Toaster } from "../lib/toast";
 
 export type ShellContext = {
   me: Schemas["Me"];
@@ -15,6 +17,22 @@ export function AppShell() {
   const [household, select] = useCurrentHousehold(me);
 
   if (!household) return null; // AuthGate guarantees at least one
+
+  return <Shell me={me} household={household} onSelect={select} />;
+}
+
+// Split out so hooks that need a household (live events) run only once
+// there is one.
+function Shell({
+  me,
+  household,
+  onSelect: select,
+}: {
+  me: Schemas["Me"];
+  household: Schemas["HouseholdSummary"];
+  onSelect: (id: string) => void;
+}) {
+  useHouseholdEvents(household.id);
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
@@ -33,6 +51,7 @@ export function AppShell() {
           <Tab to="/profile" icon={<User className="size-6" />} label="Профиль" />
         </div>
       </nav>
+      <Toaster />
     </div>
   );
 }

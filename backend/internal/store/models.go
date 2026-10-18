@@ -18,6 +18,19 @@ type AuthIdentity struct {
 	CreatedAt time.Time
 }
 
+type Category struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	Key         *string
+	Name        string
+	Emoji       *string
+	SortOrder   int32
+	Version     int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   *time.Time
+}
+
 type Household struct {
 	ID        uuid.UUID
 	Name      string
@@ -38,11 +51,43 @@ type Invite struct {
 	CreatedAt   time.Time
 }
 
+type ListItem struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	ProductID   uuid.UUID
+	Quantity    *float64
+	Unit        *string
+	Note        *string
+	StoreID     *uuid.UUID
+	AddedBy     *uuid.UUID
+	CheckedAt   *time.Time
+	CheckedBy   *uuid.UUID
+	Version     int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   *time.Time
+}
+
 type Membership struct {
 	HouseholdID uuid.UUID
 	UserID      uuid.UUID
 	Role        string
 	JoinedAt    time.Time
+}
+
+type Product struct {
+	ID             uuid.UUID
+	HouseholdID    uuid.UUID
+	Name           string
+	Description    *string
+	CategoryID     *uuid.UUID
+	DefaultStoreID *uuid.UUID
+	DefaultUnit    *string
+	UseCount       int32
+	Version        int64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	DeletedAt      *time.Time
 }
 
 type Session struct {
@@ -52,6 +97,17 @@ type Session struct {
 	CreatedAt  time.Time
 	LastSeenAt time.Time
 	ExpiresAt  time.Time
+}
+
+type Store struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	Name        string
+	SortOrder   int32
+	Version     int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }
 
 type User struct {

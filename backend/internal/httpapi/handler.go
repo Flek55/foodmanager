@@ -11,7 +11,9 @@ import (
 
 	"foodmanager/internal/api"
 	"foodmanager/internal/auth"
+	"foodmanager/internal/events"
 	"foodmanager/internal/household"
+	"foodmanager/internal/shopping"
 )
 
 // Handler implements api.StrictServerInterface. The compiler check below
@@ -20,6 +22,8 @@ type Handler struct {
 	db         *pgxpool.Pool
 	auth       *auth.Service
 	households *household.Service
+	shopping   *shopping.Service
+	hub        *events.Hub
 	cookies    cookieConfig
 	version    string
 }
@@ -30,6 +34,8 @@ type Deps struct {
 	DB           *pgxpool.Pool
 	Auth         *auth.Service
 	Households   *household.Service
+	Shopping     *shopping.Service
+	Hub          *events.Hub
 	SecureCookie bool
 	Version      string
 }
@@ -39,6 +45,8 @@ func NewHandler(d Deps) *Handler {
 		db:         d.DB,
 		auth:       d.Auth,
 		households: d.Households,
+		shopping:   d.Shopping,
+		hub:        d.Hub,
 		cookies:    cookieConfig{secure: d.SecureCookie},
 		version:    d.Version,
 	}

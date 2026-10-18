@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"foodmanager/internal/apperr"
+	"foodmanager/internal/events"
 	"foodmanager/internal/store"
 	"foodmanager/internal/testdb"
 )
@@ -50,7 +51,7 @@ type fixture struct {
 
 func setup(t *testing.T) fixture {
 	pool := testdb.New(t)
-	return fixture{ctx: context.Background(), pool: pool, svc: NewService(pool)}
+	return fixture{ctx: context.Background(), pool: pool, svc: NewService(pool, events.Nop{})}
 }
 
 func (f fixture) user(t *testing.T, name string) uuid.UUID {

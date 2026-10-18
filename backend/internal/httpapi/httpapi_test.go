@@ -12,7 +12,9 @@ import (
 
 	"foodmanager/internal/api"
 	"foodmanager/internal/auth"
+	"foodmanager/internal/events"
 	"foodmanager/internal/household"
+	"foodmanager/internal/shopping"
 	"foodmanager/internal/store"
 	"foodmanager/internal/testdb"
 )
@@ -26,10 +28,13 @@ type client struct {
 
 func newServer(t *testing.T) string {
 	pool := testdb.New(t)
+	hub := events.NewHub()
 	h := NewHandler(Deps{
 		DB:         pool,
 		Auth:       auth.NewService(store.New(pool)),
-		Households: household.NewService(pool),
+		Households: household.NewService(pool, hub),
+		Shopping:   shopping.NewService(pool, hub),
+		Hub:        hub,
 		Version:    "test",
 	})
 	srv := httptest.NewServer(NewRouter(h, slog.New(slog.DiscardHandler), ""))

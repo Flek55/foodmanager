@@ -1,0 +1,169 @@
+import { Trash2 } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import type { Schemas } from "../../api/client";
+import { isApiError } from "../../api/client";
+import { useDeleteItem, useUpdateItem } from "../../api/list";
+import { formatDate } from "../../lib/format";
+import { UNITS } from "../../lib/units";
+import { Chip, Sheet } from "../Sheet";
+import { Button, ErrorBanner, TextField } from "../ui";
+
+type Item = Schemas["ListItem"];
+
+/** Edit everything about an item. Mounted with key={item.id}, so the form
+ * state starts fresh for each item. */
+export function ItemSheet({
+  householdId,
+  item,
+  snapshot,
+  onClose,
+}: {
+  householdId: string;
+  item: Item;
+  snapshot: Schemas["ListSnapshot"];
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: item.name,
+    description: item.description ?? "",
+    note: item.note ?? "",
+    quantity: item.quantity !== undefined ? String(item.quantity).replace(".", ",") : "",
+    unit: item.unit ?? ("pcs" as Schemas["Unit"]),
+    categoryId: item.categoryId,
+    storeId: item.storeId,
+  });
+  const update = useUpdateItem(householdId);
+  const remove = useDeleteItem(householdId);
+
+  const qtyNumber = form.quantity.trim() ? Number(form.quantity.replace(",", ".")) : undefined;
+  const qtyInvalid = qtyNumber !== undefined && (!Number.isFinite(qtyNumber) || qtyNumber <= 0);
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (qtyInvalid) return;
+    update.mutate(
+      {
+        id: item.id,
+        body: {
+          name: form.name,
+          description: form.description || undefined,
+          note: form.note || undefined,
+          quantity: qtyNumber,
+          unit: qtyNumber !== undefined ? form.unit : undefined,
+          categoryId: form.categoryId,
+          storeId: form.storeId,
+        },
+      },
+      { onSuccess: onClose },
+    );
+  };
+
+  const onDelete = () => {
+    remove.mutate(item.id);
+    onClose(); // optimistic: the row is already gone
+  };
+
+  const err = update.error;
+  const fieldError = (f: string) => (isApiError(err) && err.field === f ? err.message : undefined);
+
+  return (
+    <Sheet open onClose={onClose} title="Позиция">
+      <form onSubmit={onSubmit} className="space-y-5">
+        <TextField
+          label="Название"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          error={fieldError("name")}
+        />
+
+        <div>
+          <span className="mb-1.5 block text-sm font-medium text-muted">Сколько</span>
+          <div className="flex items-center gap-2">
+            <input
+              value={form.quantity}
+              onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+              inputMode="decimal"
+              placeholder="—"
+              aria-label="Количество"
+              aria-invalid={qtyInvalid}
+              className={`h-11 w-20 rounded-xl border bg-surface px-3 text-center text-base outline-none focus:border-accent ${
+                qtyInvalid ? "border-danger" : "border-line"
+              }`}
+            />
+            <div className="flex flex-wrap gap-1.5">
+              {UNITS.map((u) => (
+                <Chip key={u.code} active={form.unit === u.code} onClick={() => setForm({ ...form, unit: u.code })}>
+                  {u.label}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <TextField
+          label="Комментарий к покупке"
+          value={form.note}
+          onChange={(e) => setForm({ ...form, note: e.target.value })}
+          placeholder="по акции, без лактозы…"
+          error={fieldError("note")}
+        />
+
+        <div>
+          <span className="mb-1.5 block text-sm font-medium text-muted">Категория</span>
+          <div className="flex flex-wrap gap-1.5">
+            {snapshot.categories.map((c) => (
+              <Chip
+                key={c.id}
+                active={form.categoryId === c.id}
+                onClick={() => setForm({ ...form, categoryId: form.categoryId === c.id ? undefined : c.id })}
+              >
+                {c.emoji} {c.name}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        {snapshot.stores.length > 0 && (
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-muted">Магазин</span>
+            <div className="flex flex-wrap gap-1.5">
+              <Chip active={!form.storeId} onClick={() => setForm({ ...form, storeId: undefined })}>
+                Любой
+              </Chip>
+              {snapshot.stores.map((s) => (
+                <Chip key={s.id} active={form.storeId === s.id} onClick={() => setForm({ ...form, storeId: s.id })}>
+                  {s.name}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <TextField
+          label="Описание товара"
+          hint="Запомнится для этого товара: бренд, жирность, вкус"
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="Простоквашино 3,2%"
+          error={fieldError("description")}
+        />
+
+        <ErrorBanner message={err && !(isApiError(err) && err.field) ? err.message : null} />
+
+        <p className="text-xs text-muted">
+          {item.addedBy ? `Добавил(а) ${item.addedBy}` : "Добавлено"} {formatDate(item.createdAt)}
+          {item.checkedAt && ` · куплено${item.checkedBy ? `: ${item.checkedBy}` : ""}`}
+        </p>
+
+        <div className="flex gap-2">
+          <Button type="submit" block loading={update.isPending} disabled={!form.name.trim() || qtyInvalid}>
+            Сохранить
+          </Button>
+          <Button type="button" variant="danger" onClick={onDelete} aria-label="Удалить из списка">
+            <Trash2 className="size-5" />
+          </Button>
+        </div>
+      </form>
+    </Sheet>
+  );
+}

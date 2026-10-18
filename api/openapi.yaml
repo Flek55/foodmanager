@@ -9,6 +9,12 @@ info:
 
     Аутентификация: httpOnly cookie `fm_session`, её ставят /auth/register и /auth/login.
     Ошибки всегда приходят в формате `Error` с машиночитаемым `code`.
+
+    Живые обновления: `GET /api/households/{householdId}/events` — поток
+    Server-Sent Events (не описан как операция, потому что это не JSON).
+    Сначала приходит событие `ready` с `{"version": N}`, затем при каждом
+    изменении данные `{"kind": "list", "version": N}` или `{"kind": "household"}`
+    (поменялись участники или название). Клиент в ответ перечитывает данные.
 servers:
   - url: /api
 security:
@@ -18,6 +24,8 @@ tags:
   - name: auth
   - name: households
   - name: invites
+  - name: list
+  - name: catalog
 paths:
   /health:
     get:
@@ -321,6 +329,334 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
 
+  /households/{householdId}/list:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+    get:
+      operationId: getList
+      summary: Всё для экрана списка покупок одним запросом
+      description: |
+        Позиции списка (в том числе купленные, пока их не убрали), справочник
+        товаров семьи (для автодополнения), категории и магазины.
+        `version` — текущая версия данных семьи; она растёт с каждым изменением.
+      tags: [list]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSnapshot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /households/{householdId}/items:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+    post:
+      operationId: addItem
+      summary: Добавить товар в список
+      description: |
+        Товар ищется в справочнике семьи по названию без учёта регистра; если
+        его нет, он создаётся, а категория угадывается по названию.
+        Если этот товар уже есть в списке (не куплен), новая позиция не
+        создаётся: у существующей обновляются переданные количество,
+        комментарий и магазин, и ответ приходит с кодом 200.
+        Повтор запроса с тем же `id` безопасен (идемпотентность для офлайна).
+      tags: [list]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddItemRequest"
+      responses:
+        "201":
+          description: Позиция добавлена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListItem"
+        "200":
+          description: Товар уже был в списке, позиция обновлена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /households/{householdId}/items/clear-checked:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+    post:
+      operationId: clearCheckedItems
+      summary: Убрать из списка все купленные позиции
+      tags: [list]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClearCheckedResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /households/{householdId}/items/{itemId}:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+      - $ref: "#/components/parameters/ItemId"
+    put:
+      operationId: updateItem
+      summary: Изменить позицию и её товар
+      description: |
+        Полная замена редактируемых полей: необязательное поле, которого нет
+        в запросе, очищается. `name`, `description` и `categoryId` относятся
+        к товару и меняются для него везде.
+      tags: [list]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateItemRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteItem
+      summary: Удалить позицию из списка
+      tags: [list]
+      responses:
+        "204":
+          description: Удалено
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /households/{householdId}/items/{itemId}/checked:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+      - $ref: "#/components/parameters/ItemId"
+    put:
+      operationId: setItemChecked
+      summary: Отметить позицию купленной или вернуть в список
+      tags: [list]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetCheckedRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /households/{householdId}/stores:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+    post:
+      operationId: createStore
+      summary: Добавить магазин
+      tags: [catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoreInput"
+      responses:
+        "201":
+          description: Создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Store"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /households/{householdId}/stores/{storeId}:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+      - name: storeId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: updateStore
+      summary: Переименовать магазин
+      tags: [catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoreInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Store"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteStore
+      summary: Удалить магазин (позиции остаются, но без магазина)
+      tags: [catalog]
+      responses:
+        "204":
+          description: Удалён
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /households/{householdId}/categories:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+    post:
+      operationId: createCategory
+      summary: Добавить категорию (в конец)
+      tags: [catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "201":
+          description: Создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /households/{householdId}/categories/order:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+    put:
+      operationId: reorderCategories
+      summary: Задать порядок категорий (как отделы идут в магазине)
+      tags: [catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderRequest"
+      responses:
+        "200":
+          description: Категории в новом порядке
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /households/{householdId}/categories/{categoryId}:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+      - name: categoryId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: updateCategory
+      summary: Переименовать категорию или сменить эмодзи
+      tags: [catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteCategory
+      summary: Удалить категорию (товары остаются без категории)
+      tags: [catalog]
+      responses:
+        "204":
+          description: Удалена
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
   securitySchemes:
     sessionCookie:
@@ -331,6 +667,13 @@ components:
   parameters:
     HouseholdId:
       name: householdId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ItemId:
+      name: itemId
       in: path
       required: true
       schema:
@@ -571,3 +914,225 @@ components:
           type: string
         memberCount:
           type: integer
+
+    Unit:
+      type: string
+      description: "Единица количества: штуки, килограммы, граммы, литры, миллилитры, упаковки"
+      enum: [pcs, kg, g, l, ml, pack]
+
+    Category:
+      type: object
+      required: [id, name, sortOrder]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        emoji:
+          type: string
+        sortOrder:
+          type: integer
+        key:
+          type: string
+          description: Ключ встроенной категории (dairy, produce, ...), у своих категорий отсутствует
+
+    Store:
+      type: object
+      required: [id, name, sortOrder]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        sortOrder:
+          type: integer
+
+    Product:
+      type: object
+      required: [id, name, useCount]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: string
+          format: uuid
+        defaultUnit:
+          $ref: "#/components/schemas/Unit"
+        defaultStoreId:
+          type: string
+          format: uuid
+        useCount:
+          type: integer
+          description: Сколько раз товар добавляли в список (для сортировки подсказок)
+
+    ListItem:
+      type: object
+      required: [id, productId, name, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: string
+          format: uuid
+        quantity:
+          type: number
+          format: double
+        unit:
+          $ref: "#/components/schemas/Unit"
+        note:
+          type: string
+        storeId:
+          type: string
+          format: uuid
+        addedBy:
+          type: string
+          description: Имя того, кто добавил
+        createdAt:
+          type: string
+          format: date-time
+        checkedAt:
+          type: string
+          format: date-time
+          description: Когда отметили купленным; отсутствует, если ещё не куплено
+        checkedBy:
+          type: string
+          description: Имя того, кто отметил купленным
+
+    ListSnapshot:
+      type: object
+      required: [version, items, products, categories, stores]
+      properties:
+        version:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListItem"
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        stores:
+          type: array
+          items:
+            $ref: "#/components/schemas/Store"
+
+    AddItemRequest:
+      type: object
+      required: [name]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id новой позиции, сгенерированный клиентом (необязателен)
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        quantity:
+          type: number
+          format: double
+        unit:
+          $ref: "#/components/schemas/Unit"
+        note:
+          type: string
+          maxLength: 200
+        storeId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+          description: Явная категория товара; без неё у нового товара категория угадывается
+
+    UpdateItemRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 200
+        categoryId:
+          type: string
+          format: uuid
+        quantity:
+          type: number
+          format: double
+        unit:
+          $ref: "#/components/schemas/Unit"
+        note:
+          type: string
+          maxLength: 200
+        storeId:
+          type: string
+          format: uuid
+
+    SetCheckedRequest:
+      type: object
+      required: [checked]
+      properties:
+        checked:
+          type: boolean
+
+    ClearCheckedResult:
+      type: object
+      required: [removed]
+      properties:
+        removed:
+          type: integer
+
+    StoreInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+
+    CategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        emoji:
+          type: string
+          maxLength: 16
+
+    ReorderRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          description: Id всех категорий семьи в нужном порядке
+          items:
+            type: string
+            format: uuid

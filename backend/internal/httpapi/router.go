@@ -28,6 +28,8 @@ func NewRouter(h *Handler, log *slog.Logger, staticDir string) http.Handler {
 	// Sec-Fetch-Site / Origin headers that all modern browsers send.
 	r.Use(http.NewCrossOriginProtection().Handler)
 
+	session := sessionMiddleware(h.auth, h.cookies, log)
+
 	strict := api.NewStrictHandlerWithOptions(h, nil, api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
 			writeAppError(w, apperr.Invalid("", "некорректный запрос: "+err.Error()))
@@ -45,13 +47,14 @@ func NewRouter(h *Handler, log *slog.Logger, staticDir string) http.Handler {
 		// Applied per API route; the LAST entry is the outermost, so the rate
 		// limiter runs before the session lookup hits the database.
 		Middlewares: []api.MiddlewareFunc{
-			sessionMiddleware(h.auth, h.cookies, log),
+			session,
 			rateLimitSensitive(newIPLimiter(10, 10)),
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
 			writeAppError(w, apperr.Invalid("", "некорректный запрос: "+err.Error()))
 		},
 	})
+	r.With(session).Get("/api/households/{householdId}/events", h.serveEvents)
 	r.HandleFunc("/api/*", func(w http.ResponseWriter, _ *http.Request) {
 		writeAppError(w, apperr.NotFound("эндпоинт не найден"))
 	})

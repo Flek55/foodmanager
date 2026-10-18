@@ -1,6 +1,6 @@
-import { Check, Copy, Crown, LogOut, Pencil, Share2, UserMinus, X } from "lucide-react";
+import { Check, ChevronRight, Copy, Crown, LogOut, Pencil, Share2, UserMinus, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import type { Schemas } from "../api/client";
 import {
   useCreateInvite,
@@ -23,6 +23,16 @@ export function FamilyPage() {
     <div className="space-y-4 pt-2">
       {isOwner && <RenameCard householdId={household.id} name={household.name} />}
       <InviteCard householdId={household.id} />
+      <Link
+        to="/catalog"
+        className="flex items-center justify-between rounded-(--radius-card) border border-line bg-surface p-5 hover:bg-line/20"
+      >
+        <span>
+          <span className="block font-semibold">Магазины и категории</span>
+          <span className="text-sm text-muted">Где покупаете и в каком порядке идут отделы</span>
+        </span>
+        <ChevronRight className="size-5 text-muted" />
+      </Link>
       <Card>
         <h2 className="mb-3 text-lg font-semibold">
           {detail.data
