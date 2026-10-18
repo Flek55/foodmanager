@@ -362,20 +362,20 @@ func (s *Service) UpdateItem(ctx context.Context, userID, householdID, itemID uu
 
 func (s *Service) SetChecked(ctx context.Context, userID, householdID, itemID uuid.UUID, checked bool) (store.ListItemViewsRow, error) {
 	err := s.write(ctx, userID, householdID, func(q *store.Queries, version int64) error {
+		productID, err := q.GetItemProduct(ctx, store.GetItemProductParams{HouseholdID: householdID, ID: itemID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errItemNotFound
+		}
+		if err != nil {
+			return err
+		}
 		params := store.SetItemCheckedParams{Version: version, HouseholdID: householdID, ID: itemID}
+		now := s.now()
 		if checked {
-			now := s.now()
 			params.CheckedAt, params.CheckedBy = &now, &userID
 		} else {
 			// Unchecking would put the product on the list twice if someone
 			// has added it again in the meantime.
-			productID, err := q.GetItemProduct(ctx, store.GetItemProductParams{HouseholdID: householdID, ID: itemID})
-			if errors.Is(err, pgx.ErrNoRows) {
-				return errItemNotFound
-			}
-			if err != nil {
-				return err
-			}
 			activeID, err := q.GetActiveItemForProduct(ctx, store.GetActiveItemForProductParams{HouseholdID: householdID, ProductID: productID})
 			if err == nil && activeID != itemID {
 				return apperr.Conflict("already_on_list", "этот товар уже снова есть в списке")
@@ -384,11 +384,13 @@ func (s *Service) SetChecked(ctx context.Context, userID, householdID, itemID uu
 				return err
 			}
 		}
-		n, err := q.SetItemChecked(ctx, params)
-		if err == nil && n == 0 {
-			return errItemNotFound
+		if _, err := q.SetItemChecked(ctx, params); err != nil {
+			return err
 		}
-		return err
+		if checked {
+			return recordPurchase(ctx, q, householdID, itemID, productID, userID, now, version)
+		}
+		return unrecordPurchase(ctx, q, householdID, itemID, productID, version)
 	})
 	if err != nil {
 		return store.ListItemViewsRow{}, err

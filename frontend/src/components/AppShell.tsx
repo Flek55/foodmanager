@@ -1,4 +1,4 @@
-import { ChevronDown, Check, CloudOff, ListChecks, Plus, RefreshCw, User, Users } from "lucide-react";
+import { ChevronDown, Check, CloudOff, ListChecks, Plus, RefreshCw, Refrigerator, User, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate, useOutletContext } from "react-router";
 import type { Schemas } from "../api/client";
@@ -50,8 +50,9 @@ function Shell({
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <div className="mx-auto grid max-w-md grid-cols-3">
+        <div className="mx-auto grid max-w-md grid-cols-4">
           <Tab to="/" icon={<ListChecks className="size-6" />} label="Список" />
+          <Tab to="/home" icon={<Refrigerator className="size-6" />} label="Дома" />
           <Tab to="/family" icon={<Users className="size-6" />} label="Семья" />
           <Tab to="/profile" icon={<User className="size-6" />} label="Профиль" />
         </div>

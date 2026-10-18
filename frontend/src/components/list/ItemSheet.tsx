@@ -9,6 +9,26 @@ import { Button, TextField } from "../ui";
 
 type Item = Schemas["ListItem"];
 
+/** Start/stop watching this product on the "Дома" screen. Applies at once. */
+function TrackToggle({ sync, product }: { sync: ListSync; product?: Schemas["Product"] }) {
+  if (!product) return null;
+  const tracked = product.stockStatus !== undefined;
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-line px-4 py-3">
+      <span>
+        <span className="block text-[15px] font-medium">Следить за запасом дома</span>
+        <span className="block text-xs text-muted">Появится во вкладке «Дома»: отмечайте «мало» и «нет»</span>
+      </span>
+      <input
+        type="checkbox"
+        checked={tracked}
+        onChange={(e) => sync.setStock(product.id, e.target.checked ? "ok" : "untracked")}
+        className="size-5 shrink-0 accent-(--color-accent)"
+      />
+    </label>
+  );
+}
+
 const MAX_NAME = 80;
 const MAX_TEXT = 200;
 
@@ -149,6 +169,8 @@ export function ItemSheet({
           placeholder="Простоквашино 3,2%"
           error={tooLong(form.description)}
         />
+
+        <TrackToggle sync={sync} product={snapshot.products.find((p) => p.id === item.productId)} />
 
         <p className="text-xs text-muted">
           {item.addedBy ? `Добавил(а) ${item.addedBy}` : "Добавлено"} {formatDate(item.createdAt)}

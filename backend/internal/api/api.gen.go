@@ -72,6 +72,51 @@ func (e Role) Valid() bool {
 	}
 }
 
+// Defines values for SetStockRequestStatus.
+const (
+	SetStockRequestStatusLow       SetStockRequestStatus = "low"
+	SetStockRequestStatusOk        SetStockRequestStatus = "ok"
+	SetStockRequestStatusOut       SetStockRequestStatus = "out"
+	SetStockRequestStatusUntracked SetStockRequestStatus = "untracked"
+)
+
+// Valid indicates whether the value is a known member of the SetStockRequestStatus enum.
+func (e SetStockRequestStatus) Valid() bool {
+	switch e {
+	case SetStockRequestStatusLow:
+		return true
+	case SetStockRequestStatusOk:
+		return true
+	case SetStockRequestStatusOut:
+		return true
+	case SetStockRequestStatusUntracked:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StockStatus.
+const (
+	StockStatusLow StockStatus = "low"
+	StockStatusOk  StockStatus = "ok"
+	StockStatusOut StockStatus = "out"
+)
+
+// Valid indicates whether the value is a known member of the StockStatus enum.
+func (e StockStatus) Valid() bool {
+	switch e {
+	case StockStatusLow:
+		return true
+	case StockStatusOk:
+		return true
+	case StockStatusOut:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Unit.
 const (
 	G    Unit = "g"
@@ -276,13 +321,33 @@ type Product struct {
 	DefaultStoreId *openapi_types.UUID `json:"defaultStoreId,omitempty"`
 
 	// DefaultUnit Единица количества: штуки, килограммы, граммы, литры, миллилитры, упаковки
-	DefaultUnit *Unit              `json:"defaultUnit,omitempty"`
-	Description *string            `json:"description,omitempty"`
-	Id          openapi_types.UUID `json:"id"`
-	Name        string             `json:"name"`
+	DefaultUnit     *Unit              `json:"defaultUnit,omitempty"`
+	Description     *string            `json:"description,omitempty"`
+	Id              openapi_types.UUID `json:"id"`
+	LastPurchasedAt *time.Time         `json:"lastPurchasedAt,omitempty"`
+	Name            string             `json:"name"`
+
+	// PurchaseCount Сколько раз товар покупали (отмечали купленным)
+	PurchaseCount int `json:"purchaseCount"`
+
+	// StockStatus Сколько осталось дома: есть, мало, нет. Отсутствует — за товаром не следят
+	StockStatus    *StockStatus `json:"stockStatus,omitempty"`
+	StockUpdatedAt *time.Time   `json:"stockUpdatedAt,omitempty"`
 
 	// UseCount Сколько раз товар добавляли в список (для сортировки подсказок)
 	UseCount int `json:"useCount"`
+}
+
+// Purchase defines model for Purchase.
+type Purchase struct {
+	BoughtAt time.Time           `json:"boughtAt"`
+	BoughtBy *string             `json:"boughtBy,omitempty"`
+	Id       openapi_types.UUID  `json:"id"`
+	Quantity *float64            `json:"quantity,omitempty"`
+	StoreId  *openapi_types.UUID `json:"storeId,omitempty"`
+
+	// Unit Единица количества: штуки, килограммы, граммы, литры, миллилитры, упаковки
+	Unit *Unit `json:"unit,omitempty"`
 }
 
 // RegisterRequest defines model for RegisterRequest.
@@ -305,6 +370,25 @@ type Role string
 type SetCheckedRequest struct {
 	Checked bool `json:"checked"`
 }
+
+// SetStockRequest defines model for SetStockRequest.
+type SetStockRequest struct {
+	// ItemId Id позиции, если товар придётся добавить в список
+	ItemId *openapi_types.UUID   `json:"itemId,omitempty"`
+	Status SetStockRequestStatus `json:"status"`
+}
+
+// SetStockRequestStatus defines model for SetStockRequest.Status.
+type SetStockRequestStatus string
+
+// StockResult defines model for StockResult.
+type StockResult struct {
+	Item    *ListItem `json:"item,omitempty"`
+	Product Product   `json:"product"`
+}
+
+// StockStatus Сколько осталось дома: есть, мало, нет. Отсутствует — за товаром не следят
+type StockStatus string
 
 // Store defines model for Store.
 type Store struct {
@@ -336,6 +420,18 @@ type Tombstones struct {
 	Items      []openapi_types.UUID `json:"items"`
 	Products   []openapi_types.UUID `json:"products"`
 	Stores     []openapi_types.UUID `json:"stores"`
+}
+
+// TrackProductRequest defines model for TrackProductRequest.
+type TrackProductRequest struct {
+	ItemId *openapi_types.UUID `json:"itemId,omitempty"`
+	Name   string              `json:"name"`
+
+	// ProductId Id нового товара, сгенерированный клиентом
+	ProductId *openapi_types.UUID `json:"productId,omitempty"`
+
+	// Status Сколько осталось дома: есть, мало, нет. Отсутствует — за товаром не следят
+	Status StockStatus `json:"status"`
 }
 
 // Unit Единица количества: штуки, килограммы, граммы, литры, миллилитры, упаковки
@@ -370,6 +466,9 @@ type InviteCode = string
 
 // ItemId defines model for ItemId.
 type ItemId = openapi_types.UUID
+
+// ProductId defines model for ProductId.
+type ProductId = openapi_types.UUID
 
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
@@ -426,6 +525,12 @@ type UpdateItemJSONRequestBody = UpdateItemRequest
 
 // SetItemCheckedJSONRequestBody defines body for SetItemChecked for application/json ContentType.
 type SetItemCheckedJSONRequestBody = SetCheckedRequest
+
+// SetStockJSONRequestBody defines body for SetStock for application/json ContentType.
+type SetStockJSONRequestBody = SetStockRequest
+
+// TrackProductJSONRequestBody defines body for TrackProduct for application/json ContentType.
+type TrackProductJSONRequestBody = TrackProductRequest
 
 // CreateStoreJSONRequestBody defines body for CreateStore for application/json ContentType.
 type CreateStoreJSONRequestBody = StoreInput
@@ -498,6 +603,15 @@ type ServerInterface interface {
 	// RemoveMember Исключить участника (владелец) или выйти из семьи (сам себя)
 	// (DELETE /households/{householdId}/members/{userId})
 	RemoveMember(w http.ResponseWriter, r *http.Request, householdId HouseholdId, userId openapi_types.UUID)
+	// ListPurchases Последние покупки товара (до 20, новые первыми)
+	// (GET /households/{householdId}/products/{productId}/purchases)
+	ListPurchases(w http.ResponseWriter, r *http.Request, householdId HouseholdId, productId ProductId)
+	// SetStock Отметить, сколько товара осталось дома
+	// (PUT /households/{householdId}/products/{productId}/stock)
+	SetStock(w http.ResponseWriter, r *http.Request, householdId HouseholdId, productId ProductId)
+	// TrackProduct Начать следить за товаром дома (по названию)
+	// (POST /households/{householdId}/stock)
+	TrackProduct(w http.ResponseWriter, r *http.Request, householdId HouseholdId)
 	// CreateStore Добавить магазин
 	// (POST /households/{householdId}/stores)
 	CreateStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId)
@@ -648,6 +762,24 @@ func (_ Unimplemented) GetList(w http.ResponseWriter, r *http.Request, household
 // RemoveMember Исключить участника (владелец) или выйти из семьи (сам себя)
 // (DELETE /households/{householdId}/members/{userId})
 func (_ Unimplemented) RemoveMember(w http.ResponseWriter, r *http.Request, householdId HouseholdId, userId openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListPurchases Последние покупки товара (до 20, новые первыми)
+// (GET /households/{householdId}/products/{productId}/purchases)
+func (_ Unimplemented) ListPurchases(w http.ResponseWriter, r *http.Request, householdId HouseholdId, productId ProductId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SetStock Отметить, сколько товара осталось дома
+// (PUT /households/{householdId}/products/{productId}/stock)
+func (_ Unimplemented) SetStock(w http.ResponseWriter, r *http.Request, householdId HouseholdId, productId ProductId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// TrackProduct Начать следить за товаром дома (по названию)
+// (POST /households/{householdId}/stock)
+func (_ Unimplemented) TrackProduct(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1251,6 +1383,102 @@ func (siw *ServerInterfaceWrapper) RemoveMember(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ListPurchases operation middleware
+func (siw *ServerInterfaceWrapper) ListPurchases(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "productId" -------------
+	var productId ProductId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "productId", chi.URLParam(r, "productId"), &productId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "productId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPurchases(w, r, householdId, productId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetStock operation middleware
+func (siw *ServerInterfaceWrapper) SetStock(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "productId" -------------
+	var productId ProductId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "productId", chi.URLParam(r, "productId"), &productId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "productId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetStock(w, r, householdId, productId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TrackProduct operation middleware
+func (siw *ServerInterfaceWrapper) TrackProduct(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TrackProduct(w, r, householdId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CreateStore operation middleware
 func (siw *ServerInterfaceWrapper) CreateStore(w http.ResponseWriter, r *http.Request) {
 
@@ -1630,6 +1858,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/households/{householdId}/items/{itemId}/checked", wrapper.SetItemChecked)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/households/{householdId}/products/{productId}/stock", wrapper.SetStock)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/households/{householdId}/products/{productId}/purchases", wrapper.ListPurchases)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/households/{householdId}/stock", wrapper.TrackProduct)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/households/{householdId}/stores", wrapper.CreateStore)
@@ -2911,6 +3148,216 @@ func (response RemoveMember409JSONResponse) VisitRemoveMemberResponse(w http.Res
 	return err
 }
 
+type ListPurchasesRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+	ProductId   ProductId   `json:"productId"`
+}
+
+type ListPurchasesResponseObject interface {
+	VisitListPurchasesResponse(w http.ResponseWriter) error
+}
+
+type ListPurchases200JSONResponse []Purchase
+
+func (response ListPurchases200JSONResponse) VisitListPurchasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPurchases401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ListPurchases401JSONResponse) VisitListPurchasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPurchases404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListPurchases404JSONResponse) VisitListPurchasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetStockRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+	ProductId   ProductId   `json:"productId"`
+	Body        *SetStockJSONRequestBody
+}
+
+type SetStockResponseObject interface {
+	VisitSetStockResponse(w http.ResponseWriter) error
+}
+
+type SetStock200JSONResponse StockResult
+
+func (response SetStock200JSONResponse) VisitSetStockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetStock400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response SetStock400JSONResponse) VisitSetStockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetStock401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response SetStock401JSONResponse) VisitSetStockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetStock404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SetStock404JSONResponse) VisitSetStockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetStock409JSONResponse struct{ ConflictJSONResponse }
+
+func (response SetStock409JSONResponse) VisitSetStockResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrackProductRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+	Body        *TrackProductJSONRequestBody
+}
+
+type TrackProductResponseObject interface {
+	VisitTrackProductResponse(w http.ResponseWriter) error
+}
+
+type TrackProduct200JSONResponse StockResult
+
+func (response TrackProduct200JSONResponse) VisitTrackProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrackProduct400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response TrackProduct400JSONResponse) VisitTrackProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrackProduct401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response TrackProduct401JSONResponse) VisitTrackProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrackProduct404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response TrackProduct404JSONResponse) VisitTrackProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TrackProduct409JSONResponse struct{ ConflictJSONResponse }
+
+func (response TrackProduct409JSONResponse) VisitTrackProductResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CreateStoreRequestObject struct {
 	HouseholdId HouseholdId `json:"householdId"`
 	Body        *CreateStoreJSONRequestBody
@@ -3366,6 +3813,15 @@ type StrictServerInterface interface {
 	// RemoveMember Исключить участника (владелец) или выйти из семьи (сам себя)
 	// (DELETE /households/{householdId}/members/{userId})
 	RemoveMember(ctx context.Context, request RemoveMemberRequestObject) (RemoveMemberResponseObject, error)
+	// ListPurchases Последние покупки товара (до 20, новые первыми)
+	// (GET /households/{householdId}/products/{productId}/purchases)
+	ListPurchases(ctx context.Context, request ListPurchasesRequestObject) (ListPurchasesResponseObject, error)
+	// SetStock Отметить, сколько товара осталось дома
+	// (PUT /households/{householdId}/products/{productId}/stock)
+	SetStock(ctx context.Context, request SetStockRequestObject) (SetStockResponseObject, error)
+	// TrackProduct Начать следить за товаром дома (по названию)
+	// (POST /households/{householdId}/stock)
+	TrackProduct(ctx context.Context, request TrackProductRequestObject) (TrackProductResponseObject, error)
 	// CreateStore Добавить магазин
 	// (POST /households/{householdId}/stores)
 	CreateStore(ctx context.Context, request CreateStoreRequestObject) (CreateStoreResponseObject, error)
@@ -4044,6 +4500,100 @@ func (sh *strictHandler) RemoveMember(w http.ResponseWriter, r *http.Request, ho
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RemoveMemberResponseObject); ok {
 		if err := validResponse.VisitRemoveMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPurchases operation middleware
+func (sh *strictHandler) ListPurchases(w http.ResponseWriter, r *http.Request, householdId HouseholdId, productId ProductId) {
+	var request ListPurchasesRequestObject
+
+	request.HouseholdId = householdId
+	request.ProductId = productId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPurchases(ctx, request.(ListPurchasesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPurchases")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPurchasesResponseObject); ok {
+		if err := validResponse.VisitListPurchasesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetStock operation middleware
+func (sh *strictHandler) SetStock(w http.ResponseWriter, r *http.Request, householdId HouseholdId, productId ProductId) {
+	var request SetStockRequestObject
+
+	request.HouseholdId = householdId
+	request.ProductId = productId
+
+	var body SetStockJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetStock(ctx, request.(SetStockRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetStock")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetStockResponseObject); ok {
+		if err := validResponse.VisitSetStockResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TrackProduct operation middleware
+func (sh *strictHandler) TrackProduct(w http.ResponseWriter, r *http.Request, householdId HouseholdId) {
+	var request TrackProductRequestObject
+
+	request.HouseholdId = householdId
+
+	var body TrackProductJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TrackProduct(ctx, request.(TrackProductRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TrackProduct")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TrackProductResponseObject); ok {
+		if err := validResponse.VisitTrackProductResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

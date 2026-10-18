@@ -52,10 +52,7 @@ func convertRows(items []store.ListItemViewsRow, products []store.Product, cats 
 	}
 	outProducts := make([]api.Product, len(products))
 	for i, p := range products {
-		outProducts[i] = api.Product{
-			Id: p.ID, Name: p.Name, Description: p.Description, CategoryId: p.CategoryID,
-			DefaultUnit: toUnit(p.DefaultUnit), DefaultStoreId: p.DefaultStoreID, UseCount: int(p.UseCount),
-		}
+		outProducts[i] = toProduct(p)
 	}
 	outCats := make([]api.Category, len(cats))
 	for i, c := range cats {

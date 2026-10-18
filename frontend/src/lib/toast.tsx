@@ -28,7 +28,12 @@ export function Toaster() {
   const t = useSyncExternalStore(subscribe, () => current);
   if (!t) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-24 z-50 flex justify-center px-4" role="status">
+    // At the top, under the header: bottom sheets slide up from below, so a
+    // bottom toast would cover their buttons.
+    <div
+      className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+4.25rem)] z-50 flex justify-center px-4"
+      role="status"
+    >
       <div key={t.id} className="animate-fade-in rounded-full bg-ink px-4 py-2.5 text-sm font-medium text-bg shadow-lg">
         {t.text}
       </div>

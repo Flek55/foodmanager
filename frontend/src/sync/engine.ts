@@ -14,7 +14,20 @@
 
 import { clear, createStore, get, set } from "idb-keyval";
 import { api, isApiError, unwrap, type ApiError } from "../api/client";
-import { applyOp, applyServerResult, findForAdd, mergeDelta, remapId, sendOp, type Op, type Snapshot } from "./ops";
+import { newId } from "../lib/uuid";
+import {
+  applyOp,
+  applyServerResult,
+  findForAdd,
+  findProduct,
+  mergeDelta,
+  openItemOf,
+  remapAfter,
+  sendOp,
+  type Op,
+  type Snapshot,
+  type StockStatus,
+} from "./ops";
 
 export type SyncStatus = {
   /** false after a network failure, until a request succeeds again */
@@ -130,6 +143,22 @@ export class ListSync {
     this.enqueue({ kind: "clearChecked" });
   }
 
+  /** Marks home stock; reports whether the product was put on the list. */
+  setStock(productId: string, status: StockStatus | "untracked", by?: string) {
+    const s = this.state.snapshot;
+    const addsItem = (status === "low" || status === "out") && !!s && !openItemOf(s, productId);
+    this.enqueue({ kind: "stock", productId, status, itemId: newId(), at: new Date().toISOString(), by });
+    return { addedToList: addsItem };
+  }
+
+  /** Starts tracking a product at home by name (creating it if new). */
+  trackProduct(name: string, status: StockStatus, by?: string) {
+    const s = this.state.snapshot;
+    const existing = s ? findProduct(s, name) : undefined;
+    this.enqueue({ kind: "track", productId: newId(), name, status, itemId: newId(), at: new Date().toISOString(), by });
+    return { alreadyTracked: existing?.stockStatus !== undefined };
+  }
+
   private enqueue(op: Op) {
     this.outbox = [...this.outbox, op];
     this.persist();
@@ -174,11 +203,8 @@ export class ListSync {
       const op = this.outbox[0]!;
       try {
         const result = await sendOp(this.householdId, op);
-        this.outbox = this.outbox.slice(1);
+        this.outbox = remapAfter(op, result, this.outbox.slice(1));
         if (this.server) this.server = applyServerResult(this.server, op, result);
-        if (op.kind === "add" && result && result.id !== op.id) {
-          this.outbox = remapId(this.outbox, op.id, result.id);
-        }
         this.markOnline();
       } catch (err) {
         if (!this.handleError(err)) return false;

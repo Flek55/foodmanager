@@ -157,14 +157,15 @@ func TestCrossSiteRequestRejected(t *testing.T) {
 	}
 }
 
-// Without TRUST_PROXY, a client can't dodge the limiter by inventing a new
-// IP for every attempt.
+// Without TRUST_PROXY, a client can't dodge the per-IP limiter by inventing
+// a new IP for every attempt. (Different emails, so the per-account limit
+// doesn't kick in first.)
 func TestSpoofedIPHeadersIgnoredByDefault(t *testing.T) {
 	c := newClient(t, newServer(t))
 	last := 0
 	for i := range 11 {
 		req, _ := http.NewRequest("POST", c.base+"/api/auth/login",
-			bytes.NewBufferString(`{"email":"x@example.com","password":"password123"}`))
+			bytes.NewBufferString(fmt.Sprintf(`{"email":"x%d@example.com","password":"password123"}`, i)))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Real-IP", fmt.Sprintf("10.0.0.%d", i))
 		req.Header.Set("X-Forwarded-For", fmt.Sprintf("10.0.1.%d", i))
@@ -180,14 +181,44 @@ func TestSpoofedIPHeadersIgnoredByDefault(t *testing.T) {
 	}
 }
 
-func TestLoginRateLimited(t *testing.T) {
+// Guessing one account's password is capped well before the per-IP limit.
+func TestLoginRateLimitedPerAccount(t *testing.T) {
 	c := newClient(t, newServer(t))
-	body := api.LoginRequest{Email: "x@example.com", Password: "password123"}
-	last := 0
-	for range 11 {
-		last = c.do("POST", "/auth/login", body, nil)
+	body := api.LoginRequest{Email: "x@example.com", Password: "wrong-password"}
+	codes := make([]int, 6)
+	for i := range codes {
+		codes[i] = c.do("POST", "/auth/login", body, nil)
 	}
-	if last != http.StatusTooManyRequests {
-		t.Fatalf("11th login attempt: want 429, got %d", last)
+	if codes[4] != http.StatusUnauthorized || codes[5] != http.StatusTooManyRequests {
+		t.Fatalf("want 5×401 then 429, got %v", codes)
+	}
+	// Another account from the same IP is still fine.
+	if code := c.do("POST", "/auth/login", api.LoginRequest{Email: "y@example.com", Password: "x"}, nil); code != http.StatusUnauthorized {
+		t.Fatalf("other account: %d", code)
+	}
+}
+
+// Five relatives onboarding at the same table (one home IP) must not hit
+// the limits: register, look at the invite, accept.
+func TestFamilyOnboardingFitsRateLimits(t *testing.T) {
+	base := newServer(t)
+	owner, hid := family(t, base, "owner@example.com")
+	var inv api.Invite
+	owner.do("POST", "/households/"+hid+"/invites", api.InviteInput{}, &inv)
+
+	for i := range 5 {
+		c := newClient(t, base)
+		reg := api.RegisterRequest{Email: fmt.Sprintf("relative%d@example.com", i), Password: "password123", DisplayName: "Родственник"}
+		if code := c.do("POST", "/auth/register", reg, nil); code != http.StatusCreated {
+			t.Fatalf("relative %d register: %d", i, code)
+		}
+		for range 2 { // the join page may load the preview more than once
+			if code := c.do("GET", "/invites/"+inv.Code, nil, nil); code != http.StatusOK {
+				t.Fatalf("relative %d preview: %d", i, code)
+			}
+		}
+		if code := c.do("POST", "/invites/"+inv.Code+"/accept", nil, nil); code != http.StatusOK {
+			t.Fatalf("relative %d accept: %d", i, code)
+		}
 	}
 }

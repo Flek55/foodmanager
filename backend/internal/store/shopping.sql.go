@@ -104,7 +104,7 @@ func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) error {
 const createProduct = `-- name: CreateProduct :one
 INSERT INTO products (household_id, name, category_id, version)
 VALUES ($1, $2, $3, $4)
-RETURNING id, household_id, name, description, category_id, default_store_id, default_unit, use_count, version, created_at, updated_at, deleted_at
+RETURNING id, household_id, name, description, category_id, default_store_id, default_unit, use_count, version, created_at, updated_at, deleted_at, stock_status, stock_updated_at, stock_updated_by, purchase_count, last_purchased_at
 `
 
 type CreateProductParams struct {
@@ -135,6 +135,11 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.StockStatus,
+		&i.StockUpdatedAt,
+		&i.StockUpdatedBy,
+		&i.PurchaseCount,
+		&i.LastPurchasedAt,
 	)
 	return i, err
 }
@@ -348,7 +353,7 @@ func (q *Queries) GetItemProduct(ctx context.Context, arg GetItemProductParams) 
 }
 
 const getProduct = `-- name: GetProduct :one
-SELECT id, household_id, name, description, category_id, default_store_id, default_unit, use_count, version, created_at, updated_at, deleted_at FROM products
+SELECT id, household_id, name, description, category_id, default_store_id, default_unit, use_count, version, created_at, updated_at, deleted_at, stock_status, stock_updated_at, stock_updated_by, purchase_count, last_purchased_at FROM products
 WHERE household_id = $1 AND id = $2 AND deleted_at IS NULL
 `
 
@@ -373,12 +378,17 @@ func (q *Queries) GetProduct(ctx context.Context, arg GetProductParams) (Product
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.StockStatus,
+		&i.StockUpdatedAt,
+		&i.StockUpdatedBy,
+		&i.PurchaseCount,
+		&i.LastPurchasedAt,
 	)
 	return i, err
 }
 
 const getProductByName = `-- name: GetProductByName :one
-SELECT id, household_id, name, description, category_id, default_store_id, default_unit, use_count, version, created_at, updated_at, deleted_at FROM products
+SELECT id, household_id, name, description, category_id, default_store_id, default_unit, use_count, version, created_at, updated_at, deleted_at, stock_status, stock_updated_at, stock_updated_by, purchase_count, last_purchased_at FROM products
 WHERE household_id = $1 AND lower(name) = lower($2::text) AND deleted_at IS NULL
 `
 
@@ -403,6 +413,11 @@ func (q *Queries) GetProductByName(ctx context.Context, arg GetProductByNamePara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.StockStatus,
+		&i.StockUpdatedAt,
+		&i.StockUpdatedBy,
+		&i.PurchaseCount,
+		&i.LastPurchasedAt,
 	)
 	return i, err
 }
@@ -589,7 +604,7 @@ func (q *Queries) ListItemViews(ctx context.Context, arg ListItemViewsParams) ([
 
 const listProducts = `-- name: ListProducts :many
 
-SELECT id, household_id, name, description, category_id, default_store_id, default_unit, use_count, version, created_at, updated_at, deleted_at FROM products
+SELECT id, household_id, name, description, category_id, default_store_id, default_unit, use_count, version, created_at, updated_at, deleted_at, stock_status, stock_updated_at, stock_updated_by, purchase_count, last_purchased_at FROM products
 WHERE household_id = $1 AND deleted_at IS NULL
 ORDER BY use_count DESC, name
 `
@@ -617,6 +632,11 @@ func (q *Queries) ListProducts(ctx context.Context, householdID uuid.UUID) ([]Pr
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.StockStatus,
+			&i.StockUpdatedAt,
+			&i.StockUpdatedBy,
+			&i.PurchaseCount,
+			&i.LastPurchasedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -630,7 +650,7 @@ func (q *Queries) ListProducts(ctx context.Context, householdID uuid.UUID) ([]Pr
 
 const listProductsSince = `-- name: ListProductsSince :many
 
-SELECT id, household_id, name, description, category_id, default_store_id, default_unit, use_count, version, created_at, updated_at, deleted_at FROM products
+SELECT id, household_id, name, description, category_id, default_store_id, default_unit, use_count, version, created_at, updated_at, deleted_at, stock_status, stock_updated_at, stock_updated_by, purchase_count, last_purchased_at FROM products
 WHERE household_id = $1 AND deleted_at IS NULL AND version > $2
 `
 
@@ -662,6 +682,11 @@ func (q *Queries) ListProductsSince(ctx context.Context, arg ListProductsSincePa
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.StockStatus,
+			&i.StockUpdatedAt,
+			&i.StockUpdatedBy,
+			&i.PurchaseCount,
+			&i.LastPurchasedAt,
 		); err != nil {
 			return nil, err
 		}

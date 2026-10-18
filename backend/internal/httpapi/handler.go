@@ -25,6 +25,7 @@ type Handler struct {
 	shopping   *shopping.Service
 	hub        *events.Hub
 	cookies    cookieConfig
+	limits     *rateLimits
 	version    string
 }
 
@@ -48,6 +49,7 @@ func NewHandler(d Deps) *Handler {
 		shopping:   d.Shopping,
 		hub:        d.Hub,
 		cookies:    cookieConfig{secure: d.SecureCookie},
+		limits:     newRateLimits(),
 		version:    d.Version,
 	}
 }

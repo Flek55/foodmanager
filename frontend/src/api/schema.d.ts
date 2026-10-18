@@ -373,6 +373,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/households/{householdId}/products/{productId}/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+                productId: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Отметить, сколько товара осталось дома
+         * @description `low` и `out` добавляют товар в список покупок, если его там ещё нет
+         *     (с id `itemId`, если он передан, — так офлайн-клиент может сразу
+         *     ссылаться на эту позицию). `untracked` — перестать следить за товаром.
+         *     Отметка позиции купленной сама ставит отслеживаемому товару `ok`.
+         */
+        put: operations["setStock"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/households/{householdId}/products/{productId}/purchases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+                productId: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        /** Последние покупки товара (до 20, новые первыми) */
+        get: operations["listPurchases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/households/{householdId}/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Начать следить за товаром дома (по названию)
+         * @description Если товара с таким названием нет, он создаётся (с id `productId`,
+         *     если передан). Если есть — возвращается существующий, с другим id.
+         */
+        post: operations["trackProduct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/households/{householdId}/stores": {
         parameters: {
             query?: never;
@@ -587,6 +656,51 @@ export interface components {
             name: string;
             sortOrder: number;
         };
+        /**
+         * @description Сколько осталось дома: есть, мало, нет. Отсутствует — за товаром не следят
+         * @enum {string}
+         */
+        StockStatus: "ok" | "low" | "out";
+        SetStockRequest: {
+            /** @enum {string} */
+            status: "ok" | "low" | "out" | "untracked";
+            /**
+             * Format: uuid
+             * @description Id позиции, если товар придётся добавить в список
+             */
+            itemId?: string;
+        };
+        TrackProductRequest: {
+            name: string;
+            status: components["schemas"]["StockStatus"];
+            /**
+             * Format: uuid
+             * @description Id нового товара, сгенерированный клиентом
+             */
+            productId?: string;
+            /** Format: uuid */
+            itemId?: string;
+        };
+        StockResult: {
+            product: components["schemas"]["Product"];
+            /**
+             * @description Для low/out — позиция товара в списке: только что добавленная или
+             *     уже бывшая там (тогда её id может отличаться от переданного itemId)
+             */
+            item?: components["schemas"]["ListItem"];
+        };
+        Purchase: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            boughtAt: string;
+            boughtBy?: string;
+            /** Format: double */
+            quantity?: number;
+            unit?: components["schemas"]["Unit"];
+            /** Format: uuid */
+            storeId?: string;
+        };
         Product: {
             /** Format: uuid */
             id: string;
@@ -599,6 +713,13 @@ export interface components {
             defaultStoreId?: string;
             /** @description Сколько раз товар добавляли в список (для сортировки подсказок) */
             useCount: number;
+            stockStatus?: components["schemas"]["StockStatus"];
+            /** Format: date-time */
+            stockUpdatedAt?: string;
+            /** @description Сколько раз товар покупали (отмечали купленным) */
+            purchaseCount: number;
+            /** Format: date-time */
+            lastPurchasedAt?: string;
         };
         ListItem: {
             /** Format: uuid */
@@ -759,6 +880,7 @@ export interface components {
     parameters: {
         HouseholdId: string;
         ItemId: string;
+        ProductId: string;
         /** @description Код без учёта регистра, дефис необязателен */
         InviteCode: string;
     };
@@ -1322,6 +1444,92 @@ export interface operations {
                     "application/json": components["schemas"]["ListItem"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    setStock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+                productId: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetStockRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listPurchases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+                productId: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Purchase"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    trackProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrackProductRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];

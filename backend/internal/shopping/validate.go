@@ -1,12 +1,20 @@
 package shopping
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"foodmanager/internal/apperr"
 )
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
 
 const (
 	maxProductName  = 80

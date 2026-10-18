@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"strings"
 
 	"foodmanager/internal/api"
 	"foodmanager/internal/apperr"
@@ -27,6 +28,11 @@ func (h *Handler) Register(ctx context.Context, req api.RegisterRequestObject) (
 func (h *Handler) Login(ctx context.Context, req api.LoginRequestObject) (api.LoginResponseObject, error) {
 	if req.Body == nil {
 		return nil, apperr.Invalid("", "пустой запрос")
+	}
+	// Per-account limit on top of the per-IP one: guessing one person's
+	// password from many IPs is capped too.
+	if !h.limits.loginPerEmail.allow(strings.ToLower(strings.TrimSpace(req.Body.Email))) {
+		return nil, apperr.TooManyRequests()
 	}
 	user, sess, err := h.auth.Login(ctx, req.Body.Email, req.Body.Password, userAgent(ctx))
 	if err != nil {

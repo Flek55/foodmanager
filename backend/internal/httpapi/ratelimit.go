@@ -12,23 +12,43 @@ import (
 	"foodmanager/internal/apperr"
 )
 
-// ipLimiter is an in-memory per-IP token bucket. Good enough for a single
+// rateLimits protects endpoints open to guessing. Limits are per kind of
+// request, so a family onboarding together behind one home IP (5 people ×
+// register + view invite + accept) stays well within them, while password
+// guessing is capped both per IP and per targeted account.
+type rateLimits struct {
+	loginPerIP    *limiter
+	loginPerEmail *limiter
+	register      *limiter
+	invites       *limiter // 31^8 possible codes: guessing is hopeless anyway
+}
+
+func newRateLimits() *rateLimits {
+	return &rateLimits{
+		loginPerIP:    newLimiter(20, 10),
+		loginPerEmail: newLimiter(5, 5),
+		register:      newLimiter(20, 10),
+		invites:       newLimiter(60, 30),
+	}
+}
+
+// limiter is an in-memory token bucket per key. Good enough for a single
 // instance; would move to Redis/Postgres if we ever run several.
-type ipLimiter struct {
+type limiter struct {
 	mu      sync.Mutex
-	clients map[string]*limiterEntry
+	buckets map[string]*bucket
 	limit   rate.Limit
 	burst   int
 }
 
-type limiterEntry struct {
+type bucket struct {
 	lim      *rate.Limiter
 	lastSeen time.Time
 }
 
-func newIPLimiter(perMinute, burst int) *ipLimiter {
-	l := &ipLimiter{
-		clients: make(map[string]*limiterEntry),
+func newLimiter(perMinute, burst int) *limiter {
+	l := &limiter{
+		buckets: make(map[string]*bucket),
 		limit:   rate.Limit(float64(perMinute) / 60),
 		burst:   burst,
 	}
@@ -36,40 +56,46 @@ func newIPLimiter(perMinute, burst int) *ipLimiter {
 	return l
 }
 
-func (l *ipLimiter) allow(ip string) bool {
+func (l *limiter) allow(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	e, ok := l.clients[ip]
+	b, ok := l.buckets[key]
 	if !ok {
-		e = &limiterEntry{lim: rate.NewLimiter(l.limit, l.burst)}
-		l.clients[ip] = e
+		b = &bucket{lim: rate.NewLimiter(l.limit, l.burst)}
+		l.buckets[key] = b
 	}
-	e.lastSeen = time.Now()
-	return e.lim.Allow()
+	b.lastSeen = time.Now()
+	return b.lim.Allow()
 }
 
-func (l *ipLimiter) cleanupLoop() {
+func (l *limiter) cleanupLoop() {
 	for range time.Tick(5 * time.Minute) {
 		l.mu.Lock()
-		for ip, e := range l.clients {
-			if time.Since(e.lastSeen) > 10*time.Minute {
-				delete(l.clients, ip)
+		for key, b := range l.buckets {
+			if time.Since(b.lastSeen) > 10*time.Minute {
+				delete(l.buckets, key)
 			}
 		}
 		l.mu.Unlock()
 	}
 }
 
-// rateLimitSensitive throttles endpoints open to guessing: password login,
-// registration and invite codes. Behind a trusted proxy r.RemoteAddr is
-// already the real client IP (middleware.RealIP, enabled by TRUST_PROXY).
-func rateLimitSensitive(l *ipLimiter) func(http.Handler) http.Handler {
+// rateLimitByIP applies the per-IP limits. Behind a trusted proxy
+// r.RemoteAddr is already the real client IP (middleware.RealIP, enabled by
+// TRUST_PROXY); the per-email login limit is applied in the Login handler.
+func rateLimitByIP(rl *rateLimits) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			p := r.URL.Path
-			sensitive := (r.Method == http.MethodPost && (p == "/api/auth/login" || p == "/api/auth/register")) ||
-				strings.HasPrefix(p, "/api/invites/")
-			if sensitive && !l.allow(clientIP(r)) {
+			var l *limiter
+			switch p := r.URL.Path; {
+			case r.Method == http.MethodPost && p == "/api/auth/login":
+				l = rl.loginPerIP
+			case r.Method == http.MethodPost && p == "/api/auth/register":
+				l = rl.register
+			case strings.HasPrefix(p, "/api/invites/"):
+				l = rl.invites
+			}
+			if l != nil && !l.allow(clientIP(r)) {
 				writeAppError(w, apperr.TooManyRequests())
 				return
 			}

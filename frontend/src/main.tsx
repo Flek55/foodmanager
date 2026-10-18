@@ -28,7 +28,7 @@ persistQueries(queryClient);
 
 configureSync({
   onDropped: (op, err) => {
-    const what = op.kind === "add" ? `«${op.name}»` : "изменение";
+    const what = op.kind === "add" || op.kind === "track" ? `«${op.name}»` : "изменение";
     toast(`Не удалось сохранить ${what}: ${err.message}`);
   },
   // Session expired or removed from the household: re-check who we are;

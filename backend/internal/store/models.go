@@ -76,18 +76,35 @@ type Membership struct {
 }
 
 type Product struct {
-	ID             uuid.UUID
-	HouseholdID    uuid.UUID
-	Name           string
-	Description    *string
-	CategoryID     *uuid.UUID
-	DefaultStoreID *uuid.UUID
-	DefaultUnit    *string
-	UseCount       int32
-	Version        int64
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	DeletedAt      *time.Time
+	ID              uuid.UUID
+	HouseholdID     uuid.UUID
+	Name            string
+	Description     *string
+	CategoryID      *uuid.UUID
+	DefaultStoreID  *uuid.UUID
+	DefaultUnit     *string
+	UseCount        int32
+	Version         int64
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       *time.Time
+	StockStatus     *string
+	StockUpdatedAt  *time.Time
+	StockUpdatedBy  *uuid.UUID
+	PurchaseCount   int32
+	LastPurchasedAt *time.Time
+}
+
+type PurchaseEvent struct {
+	ID          uuid.UUID
+	HouseholdID uuid.UUID
+	ProductID   uuid.UUID
+	ItemID      *uuid.UUID
+	Quantity    *float64
+	Unit        *string
+	StoreID     *uuid.UUID
+	BoughtBy    *uuid.UUID
+	BoughtAt    time.Time
 }
 
 type Session struct {

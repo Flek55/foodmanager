@@ -4,6 +4,7 @@ import { AuthGate } from "./components/AuthGate";
 import { AuthPage } from "./pages/AuthPage";
 import { CatalogPage } from "./pages/CatalogPage";
 import { FamilyPage } from "./pages/FamilyPage";
+import { HomePage } from "./pages/HomePage";
 import { JoinPage } from "./pages/JoinPage";
 import { ListPage } from "./pages/ListPage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -24,6 +25,7 @@ export function App() {
       <Route element={<AuthGate />}>
         <Route element={<AppShell />}>
           <Route index element={<ListPage />} />
+          <Route path="/home" element={<HomePage />} />
           <Route path="/family" element={<FamilyPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/profile" element={<ProfilePage />} />

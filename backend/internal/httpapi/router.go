@@ -58,7 +58,7 @@ func NewRouter(h *Handler, log *slog.Logger, opts RouterOptions) http.Handler {
 		// limiter runs before the session lookup hits the database.
 		Middlewares: []api.MiddlewareFunc{
 			session,
-			rateLimitSensitive(newIPLimiter(10, 10)),
+			rateLimitByIP(h.limits),
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
 			writeAppError(w, apperr.Invalid("", "некорректный запрос: "+err.Error()))

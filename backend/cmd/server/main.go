@@ -82,16 +82,18 @@ func run() error {
 
 	hub := events.NewHub()
 	authSvc := auth.NewService(store.New(pool))
+	shoppingSvc := shopping.NewService(pool, hub)
 	handler := httpapi.NewHandler(httpapi.Deps{
 		DB:           pool,
 		Auth:         authSvc,
 		Households:   household.NewService(pool, hub),
-		Shopping:     shopping.NewService(pool, hub),
+		Shopping:     shoppingSvc,
 		Hub:          hub,
 		SecureCookie: cfg.IsProd(),
 		Version:      version,
 	})
 	go purgeSessionsLoop(ctx, authSvc, log)
+	go clearBoughtItemsLoop(ctx, shoppingSvc, log)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -136,6 +138,26 @@ func purgeSessionsLoop(ctx context.Context, svc *auth.Service, log *slog.Logger)
 				log.Error("purge expired sessions", "err", err)
 			} else if n > 0 {
 				log.Info("purged expired sessions", "count", n)
+			}
+		}
+	}
+}
+
+// clearBoughtItemsLoop takes bought items off the lists some hours after
+// check-off, so the "В корзине" section doesn't grow forever.
+func clearBoughtItemsLoop(ctx context.Context, svc *shopping.Service, log *slog.Logger) {
+	t := time.NewTicker(15 * time.Minute)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			n, err := svc.ClearOldBoughtItems(ctx, shopping.BoughtItemsTTL)
+			if err != nil {
+				log.Error("clear bought items", "err", err)
+			} else if n > 0 {
+				log.Info("cleared bought items", "count", n)
 			}
 		}
 	}

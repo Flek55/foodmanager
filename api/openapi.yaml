@@ -25,6 +25,7 @@ tags:
   - name: households
   - name: invites
   - name: list
+  - name: stock
   - name: catalog
 paths:
   /health:
@@ -520,6 +521,95 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
+  /households/{householdId}/products/{productId}/stock:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+      - $ref: "#/components/parameters/ProductId"
+    put:
+      operationId: setStock
+      summary: Отметить, сколько товара осталось дома
+      description: |
+        `low` и `out` добавляют товар в список покупок, если его там ещё нет
+        (с id `itemId`, если он передан, — так офлайн-клиент может сразу
+        ссылаться на эту позицию). `untracked` — перестать следить за товаром.
+        Отметка позиции купленной сама ставит отслеживаемому товару `ok`.
+      tags: [stock]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetStockRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /households/{householdId}/products/{productId}/purchases:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+      - $ref: "#/components/parameters/ProductId"
+    get:
+      operationId: listPurchases
+      summary: Последние покупки товара (до 20, новые первыми)
+      tags: [stock]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Purchase"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /households/{householdId}/stock:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+    post:
+      operationId: trackProduct
+      summary: Начать следить за товаром дома (по названию)
+      description: |
+        Если товара с таким названием нет, он создаётся (с id `productId`,
+        если передан). Если есть — возвращается существующий, с другим id.
+      tags: [stock]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrackProductRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
   /households/{householdId}/stores:
     parameters:
       - $ref: "#/components/parameters/HouseholdId"
@@ -708,6 +798,13 @@ components:
         format: uuid
     ItemId:
       name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProductId:
+      name: productId
       in: path
       required: true
       schema:
@@ -983,9 +1080,77 @@ components:
         sortOrder:
           type: integer
 
+    StockStatus:
+      type: string
+      description: "Сколько осталось дома: есть, мало, нет. Отсутствует — за товаром не следят"
+      enum: [ok, low, out]
+
+    SetStockRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, low, out, untracked]
+        itemId:
+          type: string
+          format: uuid
+          description: Id позиции, если товар придётся добавить в список
+
+    TrackProductRequest:
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        status:
+          $ref: "#/components/schemas/StockStatus"
+        productId:
+          type: string
+          format: uuid
+          description: Id нового товара, сгенерированный клиентом
+        itemId:
+          type: string
+          format: uuid
+
+    StockResult:
+      type: object
+      required: [product]
+      properties:
+        product:
+          $ref: "#/components/schemas/Product"
+        item:
+          $ref: "#/components/schemas/ListItem"
+          description: |
+            Для low/out — позиция товара в списке: только что добавленная или
+            уже бывшая там (тогда её id может отличаться от переданного itemId)
+
+    Purchase:
+      type: object
+      required: [id, boughtAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        boughtAt:
+          type: string
+          format: date-time
+        boughtBy:
+          type: string
+        quantity:
+          type: number
+          format: double
+        unit:
+          $ref: "#/components/schemas/Unit"
+        storeId:
+          type: string
+          format: uuid
+
     Product:
       type: object
-      required: [id, name, useCount]
+      required: [id, name, useCount, purchaseCount]
       properties:
         id:
           type: string
@@ -1005,6 +1170,17 @@ components:
         useCount:
           type: integer
           description: Сколько раз товар добавляли в список (для сортировки подсказок)
+        stockStatus:
+          $ref: "#/components/schemas/StockStatus"
+        stockUpdatedAt:
+          type: string
+          format: date-time
+        purchaseCount:
+          type: integer
+          description: Сколько раз товар покупали (отмечали купленным)
+        lastPurchasedAt:
+          type: string
+          format: date-time
 
     ListItem:
       type: object
