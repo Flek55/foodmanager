@@ -1,24 +1,30 @@
 import { Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { Schemas } from "../../api/client";
-import { isApiError } from "../../api/client";
-import { useDeleteItem, useUpdateItem } from "../../api/list";
 import { formatDate } from "../../lib/format";
 import { UNITS } from "../../lib/units";
+import type { ListSync } from "../../sync/engine";
 import { Chip, Sheet } from "../Sheet";
-import { Button, ErrorBanner, TextField } from "../ui";
+import { Button, TextField } from "../ui";
 
 type Item = Schemas["ListItem"];
 
-/** Edit everything about an item. Mounted with key={item.id}, so the form
- * state starts fresh for each item. */
+const MAX_NAME = 80;
+const MAX_TEXT = 200;
+
+/**
+ * Edit everything about an item. Mounted with key={item.id}, so the form
+ * state starts fresh for each item. Saving is optimistic and works offline:
+ * the sheet closes at once; if the server later rejects the change, the
+ * sync engine rolls it back and shows a toast.
+ */
 export function ItemSheet({
-  householdId,
+  sync,
   item,
   snapshot,
   onClose,
 }: {
-  householdId: string;
+  sync: ListSync;
   item: Item;
   snapshot: Schemas["ListSnapshot"];
   onClose: () => void;
@@ -32,39 +38,35 @@ export function ItemSheet({
     categoryId: item.categoryId,
     storeId: item.storeId,
   });
-  const update = useUpdateItem(householdId);
-  const remove = useDeleteItem(householdId);
 
   const qtyNumber = form.quantity.trim() ? Number(form.quantity.replace(",", ".")) : undefined;
   const qtyInvalid = qtyNumber !== undefined && (!Number.isFinite(qtyNumber) || qtyNumber <= 0);
+  const name = form.name.trim();
+  // Same limits as the server, checked here because offline there's no
+  // server to ask.
+  const nameError = !name ? "Укажите название" : name.length > MAX_NAME ? `Не длиннее ${MAX_NAME} символов` : undefined;
+  const tooLong = (s: string) => (s.trim().length > MAX_TEXT ? `Не длиннее ${MAX_TEXT} символов` : undefined);
+  const invalid = !!nameError || qtyInvalid || !!tooLong(form.note) || !!tooLong(form.description);
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (qtyInvalid) return;
-    update.mutate(
-      {
-        id: item.id,
-        body: {
-          name: form.name,
-          description: form.description || undefined,
-          note: form.note || undefined,
-          quantity: qtyNumber,
-          unit: qtyNumber !== undefined ? form.unit : undefined,
-          categoryId: form.categoryId,
-          storeId: form.storeId,
-        },
-      },
-      { onSuccess: onClose },
-    );
+    if (invalid) return;
+    sync.updateItem(item.id, {
+      name,
+      description: form.description.trim() || undefined,
+      note: form.note.trim() || undefined,
+      quantity: qtyNumber,
+      unit: qtyNumber !== undefined ? form.unit : undefined,
+      categoryId: form.categoryId,
+      storeId: form.storeId,
+    });
+    onClose();
   };
 
   const onDelete = () => {
-    remove.mutate(item.id);
-    onClose(); // optimistic: the row is already gone
+    sync.deleteItem(item.id);
+    onClose();
   };
-
-  const err = update.error;
-  const fieldError = (f: string) => (isApiError(err) && err.field === f ? err.message : undefined);
 
   return (
     <Sheet open onClose={onClose} title="Позиция">
@@ -73,7 +75,7 @@ export function ItemSheet({
           label="Название"
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          error={fieldError("name")}
+          error={form.name !== item.name ? nameError : undefined}
         />
 
         <div>
@@ -105,7 +107,7 @@ export function ItemSheet({
           value={form.note}
           onChange={(e) => setForm({ ...form, note: e.target.value })}
           placeholder="по акции, без лактозы…"
-          error={fieldError("note")}
+          error={tooLong(form.note)}
         />
 
         <div>
@@ -145,10 +147,8 @@ export function ItemSheet({
           value={form.description}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           placeholder="Простоквашино 3,2%"
-          error={fieldError("description")}
+          error={tooLong(form.description)}
         />
-
-        <ErrorBanner message={err && !(isApiError(err) && err.field) ? err.message : null} />
 
         <p className="text-xs text-muted">
           {item.addedBy ? `Добавил(а) ${item.addedBy}` : "Добавлено"} {formatDate(item.createdAt)}
@@ -156,7 +156,7 @@ export function ItemSheet({
         </p>
 
         <div className="flex gap-2">
-          <Button type="submit" block loading={update.isPending} disabled={!form.name.trim() || qtyInvalid}>
+          <Button type="submit" block disabled={invalid}>
             Сохранить
           </Button>
           <Button type="button" variant="danger" onClick={onDelete} aria-label="Удалить из списка">

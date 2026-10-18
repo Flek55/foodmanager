@@ -1,10 +1,13 @@
-import { ChevronDown, Check, ListChecks, Plus, User, Users } from "lucide-react";
+import { ChevronDown, Check, CloudOff, ListChecks, Plus, RefreshCw, User, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate, useOutletContext } from "react-router";
 import type { Schemas } from "../api/client";
 import { useCurrentHousehold } from "../lib/currentHousehold";
 import { useHouseholdEvents } from "../lib/events";
+import { pluralize } from "../lib/format";
 import { Toaster } from "../lib/toast";
+import type { SyncStatus } from "../sync/engine";
+import { useListSync } from "../sync/useListSync";
 
 export type ShellContext = {
   me: Schemas["Me"];
@@ -33,11 +36,13 @@ function Shell({
   onSelect: (id: string) => void;
 }) {
   useHouseholdEvents(household.id);
+  const { status } = useListSync(household.id);
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
-      <header className="sticky top-0 z-10 bg-bg/85 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 backdrop-blur">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-bg/85 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 backdrop-blur">
         <HouseholdSwitcher me={me} current={household} onSelect={select} />
+        <SyncBadge status={status} />
       </header>
 
       <main className="flex-1 px-4 pb-28">
@@ -58,6 +63,31 @@ function Shell({
 
 export function useShell() {
   return useOutletContext<ShellContext>();
+}
+
+/** Quiet when all is synced; otherwise says what's going on. */
+function SyncBadge({ status }: { status: SyncStatus }) {
+  const changes = (n: number) => `${n} ${pluralize(n, "изменение", "изменения", "изменений")}`;
+  if (!status.online) {
+    return (
+      <span
+        className="flex shrink-0 items-center gap-1.5 rounded-full bg-warn/15 px-3 py-1 text-xs font-semibold text-warn"
+        title={status.pending ? `${changes(status.pending)} отправятся, когда появится связь` : undefined}
+      >
+        <CloudOff className="size-3.5" />
+        Офлайн{status.pending > 0 && ` · ${status.pending}`}
+      </span>
+    );
+  }
+  if (status.pending > 0) {
+    return (
+      <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-line/60 px-3 py-1 text-xs font-semibold text-muted">
+        <RefreshCw className="size-3.5 animate-spin" />
+        Отправка · {status.pending}
+      </span>
+    );
+  }
+  return null;
 }
 
 function Tab({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) {

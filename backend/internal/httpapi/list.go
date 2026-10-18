@@ -18,29 +18,54 @@ func (h *Handler) GetList(ctx context.Context, req api.GetListRequestObject) (ap
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListSnapshot{
-		Version:    snap.Version,
-		Items:      make([]api.ListItem, len(snap.Items)),
-		Products:   make([]api.Product, len(snap.Products)),
-		Categories: make([]api.Category, len(snap.Categories)),
-		Stores:     make([]api.Store, len(snap.Stores)),
+	out := api.ListSnapshot{Version: snap.Version}
+	out.Items, out.Products, out.Categories, out.Stores = convertRows(snap.Items, snap.Products, snap.Categories, snap.Stores)
+	return api.GetList200JSONResponse(out), nil
+}
+
+func (h *Handler) SyncList(ctx context.Context, req api.SyncListRequestObject) (api.SyncListResponseObject, error) {
+	user, err := currentUser(ctx)
+	if err != nil {
+		return nil, err
 	}
-	for i, it := range snap.Items {
-		out.Items[i] = toListItem(it)
+	d, err := h.shopping.Changes(ctx, user.ID, req.HouseholdId, req.Params.Since)
+	if err != nil {
+		return nil, err
 	}
-	for i, p := range snap.Products {
-		out.Products[i] = api.Product{
+	out := api.SyncResponse{
+		Version: d.Version,
+		Deleted: api.Tombstones{
+			Items: d.Deleted.Items, Products: d.Deleted.Products,
+			Categories: d.Deleted.Categories, Stores: d.Deleted.Stores,
+		},
+	}
+	out.Items, out.Products, out.Categories, out.Stores = convertRows(d.Items, d.Products, d.Categories, d.Stores)
+	return api.SyncList200JSONResponse(out), nil
+}
+
+func convertRows(items []store.ListItemViewsRow, products []store.Product, cats []store.Category, stores []store.Store) (
+	[]api.ListItem, []api.Product, []api.Category, []api.Store,
+) {
+	outItems := make([]api.ListItem, len(items))
+	for i, it := range items {
+		outItems[i] = toListItem(it)
+	}
+	outProducts := make([]api.Product, len(products))
+	for i, p := range products {
+		outProducts[i] = api.Product{
 			Id: p.ID, Name: p.Name, Description: p.Description, CategoryId: p.CategoryID,
 			DefaultUnit: toUnit(p.DefaultUnit), DefaultStoreId: p.DefaultStoreID, UseCount: int(p.UseCount),
 		}
 	}
-	for i, c := range snap.Categories {
-		out.Categories[i] = toCategory(c)
+	outCats := make([]api.Category, len(cats))
+	for i, c := range cats {
+		outCats[i] = toCategory(c)
 	}
-	for i, s := range snap.Stores {
-		out.Stores[i] = toStore(s)
+	outStores := make([]api.Store, len(stores))
+	for i, s := range stores {
+		outStores[i] = toStore(s)
 	}
-	return api.GetList200JSONResponse(out), nil
+	return outItems, outProducts, outCats, outStores
 }
 
 func (h *Handler) AddItem(ctx context.Context, req api.AddItemRequestObject) (api.AddItemResponseObject, error) {

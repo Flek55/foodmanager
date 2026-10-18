@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="116" fill="#2f7d4f"/>
+  <!-- Basket glyph (Lucide "shopping-basket", ISC license), 24px grid scaled to 320px -->
+  <g transform="translate(96 100) scale(13.333)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m15 11-1 9"/>
+    <path d="m19 11-4-7"/>
+    <path d="M2 11h20"/>
+    <path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/>
+    <path d="M4.5 15.5h15"/>
+    <path d="m5 11 4-7"/>
+    <path d="m9 11 1 9"/>
+  </g>
+</svg>

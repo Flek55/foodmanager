@@ -189,8 +189,48 @@ UPDATE list_items
 SET deleted_at = now(), version = @version, updated_at = now()
 WHERE household_id = @household_id AND checked_at IS NOT NULL AND deleted_at IS NULL;
 
+-- Item rows embed product fields (name, category), so a product change must
+-- also bump its items' version, or delta sync would miss it.
+-- name: TouchItemsOfProduct :exec
+UPDATE list_items SET version = @version
+WHERE household_id = @household_id AND product_id = @product_id AND deleted_at IS NULL;
+
+-- Same, for every item whose product is in the category (call before
+-- detaching the category from products).
+-- name: TouchItemsOfCategory :exec
+UPDATE list_items AS i SET version = @version
+WHERE i.household_id = @household_id AND i.deleted_at IS NULL
+  AND i.product_id IN (SELECT p.id FROM products AS p WHERE p.category_id = @category_id);
+
+-- ---- Delta sync ----
+
+-- name: ListProductsSince :many
+SELECT * FROM products
+WHERE household_id = @household_id AND deleted_at IS NULL AND version > @since;
+
+-- name: ListCategoriesSince :many
+SELECT * FROM categories
+WHERE household_id = @household_id AND deleted_at IS NULL AND version > @since;
+
+-- name: ListStoresSince :many
+SELECT * FROM stores
+WHERE household_id = @household_id AND deleted_at IS NULL AND version > @since;
+
+-- name: ListTombstonesSince :many
+SELECT 'item'::text AS kind, i.id FROM list_items AS i
+WHERE i.household_id = @household_id::uuid AND i.deleted_at IS NOT NULL AND i.version > @since::bigint
+UNION ALL
+SELECT 'product', p.id FROM products AS p
+WHERE p.household_id = @household_id::uuid AND p.deleted_at IS NOT NULL AND p.version > @since::bigint
+UNION ALL
+SELECT 'category', c.id FROM categories AS c
+WHERE c.household_id = @household_id::uuid AND c.deleted_at IS NOT NULL AND c.version > @since::bigint
+UNION ALL
+SELECT 'store', s.id FROM stores AS s
+WHERE s.household_id = @household_id::uuid AND s.deleted_at IS NOT NULL AND s.version > @since::bigint;
+
 -- Items as the UI shows them: joined with their product and people's names.
--- Pass item_id to fetch a single item, or NULL for the whole list.
+-- Filters are optional: item_id for a single item, since for delta sync.
 -- name: ListItemViews :many
 SELECT
     i.id, i.product_id, p.name, p.description, p.category_id,
@@ -205,4 +245,5 @@ LEFT JOIN users cu ON cu.id = i.checked_by
 WHERE i.household_id = @household_id
   AND i.deleted_at IS NULL
   AND (sqlc.narg(item_id)::uuid IS NULL OR i.id = sqlc.narg(item_id)::uuid)
+  AND (sqlc.narg(since)::bigint IS NULL OR i.version > sqlc.narg(since)::bigint)
 ORDER BY i.created_at, i.id;

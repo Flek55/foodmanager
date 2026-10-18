@@ -352,6 +352,40 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /households/{householdId}/sync:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+    get:
+      operationId: syncList
+      summary: Изменения списка после версии `since` (для офлайн-клиента)
+      description: |
+        Возвращает всё, что изменилось с версии `since`: новые и изменённые
+        записи и id удалённых. Клиент применяет это к своему снимку и
+        запоминает новую `version`. Если `since` больше текущей версии
+        (например, база пересоздана), клиент должен заново загрузить /list.
+      tags: [list]
+      parameters:
+        - name: since
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /households/{householdId}/items:
     parameters:
       - $ref: "#/components/parameters/HouseholdId"
@@ -1036,6 +1070,58 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Store"
+
+    SyncResponse:
+      type: object
+      required: [version, items, products, categories, stores, deleted]
+      properties:
+        version:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListItem"
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        stores:
+          type: array
+          items:
+            $ref: "#/components/schemas/Store"
+        deleted:
+          $ref: "#/components/schemas/Tombstones"
+
+    Tombstones:
+      type: object
+      description: Id записей, удалённых после `since`
+      required: [items, products, categories, stores]
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+            format: uuid
+        products:
+          type: array
+          items:
+            type: string
+            format: uuid
+        categories:
+          type: array
+          items:
+            type: string
+            format: uuid
+        stores:
+          type: array
+          items:
+            type: string
+            format: uuid
 
     AddItemRequest:
       type: object

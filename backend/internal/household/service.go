@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	errHouseholdNotFound = apperr.NotFound("семья не найдена")
+	errHouseholdNotFound = apperr.NotFoundCode(apperr.CodeHouseholdNotFound, "семья не найдена")
 	errInviteNotFound    = apperr.NotFound("код не найден или больше не действует")
 )
 

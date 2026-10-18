@@ -1,35 +1,42 @@
-import { ChevronDown, PartyPopper, Plus } from "lucide-react";
+import { ChevronDown, CloudOff, PartyPopper, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Schemas } from "../api/client";
-import { useAddItem, useClearChecked, useList, useSetChecked } from "../api/list";
 import { useShell } from "../components/AppShell";
 import { ItemRow } from "../components/list/ItemRow";
 import { ItemSheet } from "../components/list/ItemSheet";
 import { QuickAdd } from "../components/list/QuickAdd";
 import { StoreFilter } from "../components/list/StoreFilter";
-import { Card, ErrorBanner } from "../components/ui";
-import { pluralize } from "../lib/format";
-import { toast } from "../lib/toast";
+import { Card } from "../components/ui";
 import { usePersistentState } from "../lib/usePersistentState";
 import { newId } from "../lib/uuid";
+import type { ListSync } from "../sync/engine";
+import { useListSync } from "../sync/useListSync";
 
 type Item = Schemas["ListItem"];
 type Snapshot = Schemas["ListSnapshot"];
 
 export function ListPage() {
-  const { household } = useShell();
-  const list = useList(household.id);
+  const { me, household } = useShell();
+  const { snapshot, loaded, status, sync } = useListSync(household.id);
 
-  if (list.isPending) return <ListSkeleton />;
-  if (list.isError) return <ErrorBanner message={list.error.message} />;
-  return <ListView householdId={household.id} snapshot={list.data} />;
+  if (snapshot) return <ListView sync={sync} snapshot={snapshot} userName={me.user.displayName} />;
+  if (loaded && !status.online) {
+    return (
+      <Card className="mt-1 py-10 text-center">
+        <CloudOff className="mx-auto mb-3 size-8 text-muted" />
+        <h2 className="font-semibold">Нет связи</h2>
+        <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
+          Список этой семьи ещё ни разу не загружался на этом устройстве. Он появится, как только будет интернет.
+        </p>
+      </Card>
+    );
+  }
+  return <ListSkeleton />;
 }
 
-function ListView({ householdId, snapshot }: { householdId: string; snapshot: Snapshot }) {
-  const [storeFilter, setStoreFilter] = usePersistentState<string | null>(`fm.store.${householdId}`, null);
+function ListView({ sync, snapshot, userName }: { sync: ListSync; snapshot: Snapshot; userName: string }) {
+  const [storeFilter, setStoreFilter] = usePersistentState<string | null>(`fm.store.${sync.householdId}`, null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const setChecked = useSetChecked(householdId);
-  const clearChecked = useClearChecked(householdId);
 
   // A remembered store may have been deleted meanwhile.
   const activeStore = snapshot.stores.some((s) => s.id === storeFilter) ? storeFilter : null;
@@ -43,26 +50,23 @@ function ListView({ householdId, snapshot }: { householdId: string; snapshot: Sn
   const groups = groupByCategory(pending, snapshot.categories);
   const editing = snapshot.items.find((i) => i.id === editingId);
 
-  const toggle = (item: Item) =>
-    setChecked.mutate({ id: item.id, checked: !item.checkedAt }, { onError: (err) => toast(err.message) });
-
   const row = (item: Item) => (
     <ItemRow
       key={item.id}
       item={item}
       storeName={!activeStore && item.storeId ? storeNames.get(item.storeId) : undefined}
-      onToggle={() => toggle(item)}
+      onToggle={() => sync.setChecked(item.id, !item.checkedAt)}
       onEdit={() => setEditingId(item.id)}
     />
   );
 
   return (
     <div className="space-y-4 pt-1">
-      <QuickAdd householdId={householdId} snapshot={snapshot} storeId={activeStore} />
+      <QuickAdd sync={sync} snapshot={snapshot} storeId={activeStore} userName={userName} />
       <StoreFilter stores={snapshot.stores} value={activeStore} onChange={setStoreFilter} />
 
       {pending.length === 0 ? (
-        <EmptyState householdId={householdId} snapshot={snapshot} storeId={activeStore} hadItems={bought.length > 0} />
+        <EmptyState sync={sync} snapshot={snapshot} storeId={activeStore} hadItems={bought.length > 0} userName={userName} />
       ) : (
         <div className="space-y-3">
           {groups.map((g) => (
@@ -88,9 +92,7 @@ function ListView({ householdId, snapshot }: { householdId: string; snapshot: Sn
             <button
               onClick={(e) => {
                 e.preventDefault();
-                clearChecked.mutate(undefined, {
-                  onSuccess: (r) => toast(`Убрали ${r.removed} ${pluralize(r.removed, "позицию", "позиции", "позиций")}`),
-                });
+                sync.clearChecked();
               }}
               className="ml-auto rounded-lg px-2 py-1 text-xs font-semibold text-danger hover:bg-danger/10"
             >
@@ -102,13 +104,7 @@ function ListView({ householdId, snapshot }: { householdId: string; snapshot: Sn
       )}
 
       {editing && (
-        <ItemSheet
-          key={editing.id}
-          householdId={householdId}
-          item={editing}
-          snapshot={snapshot}
-          onClose={() => setEditingId(null)}
-        />
+        <ItemSheet key={editing.id} sync={sync} item={editing} snapshot={snapshot} onClose={() => setEditingId(null)} />
       )}
     </div>
   );
@@ -133,19 +129,23 @@ function groupByCategory(items: Item[], categories: Schemas["Category"][]): Grou
 
 /** Empty list: celebrate, and offer one-tap re-adding of usual purchases. */
 function EmptyState({
-  householdId,
+  sync,
   snapshot,
   storeId,
   hadItems,
+  userName,
 }: {
-  householdId: string;
+  sync: ListSync;
   snapshot: Snapshot;
   storeId: string | null;
   hadItems: boolean;
+  userName: string;
 }) {
-  const add = useAddItem(householdId);
   const onList = new Set(snapshot.items.filter((i) => !i.checkedAt).map((i) => i.productId));
-  const usual = snapshot.products.filter((p) => p.useCount > 0 && !onList.has(p.id)).slice(0, 10);
+  const usual = snapshot.products
+    .filter((p) => p.useCount > 0 && !onList.has(p.id))
+    .sort((a, b) => b.useCount - a.useCount)
+    .slice(0, 10);
 
   return (
     <Card className="py-8 text-center">
@@ -165,7 +165,7 @@ function EmptyState({
             {usual.map((p) => (
               <button
                 key={p.id}
-                onClick={() => add.mutate({ id: newId(), name: p.name, storeId: storeId ?? undefined })}
+                onClick={() => sync.addItem({ id: newId(), name: p.name, storeId: storeId ?? undefined, by: userName })}
                 className="inline-flex items-center gap-1 rounded-full border border-line bg-bg px-3 py-1.5 text-sm font-medium hover:border-accent hover:text-accent"
               >
                 <Plus className="size-3.5" /> {p.name}

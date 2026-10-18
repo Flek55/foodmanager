@@ -33,7 +33,7 @@ func (h *Handler) serveEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	householdID, err := uuid.Parse(chi.URLParam(r, "householdId"))
 	if err != nil {
-		writeAppError(w, apperr.NotFound("семья не найдена"))
+		writeAppError(w, apperr.NotFoundCode(apperr.CodeHouseholdNotFound, "семья не найдена"))
 		return
 	}
 

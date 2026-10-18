@@ -1,6 +1,6 @@
 # Commands work in both cmd.exe and sh: no `cd`, only -C / --prefix flags.
 
-.PHONY: help db-up db-down db-reset db-psql run web gen build test check
+.PHONY: help db-up db-down db-reset db-psql run web gen build preview test check
 
 help:
 	@echo db-up     - start dev Postgres (localhost:5433)
@@ -11,6 +11,7 @@ help:
 	@echo web       - run Vite dev server on :5173
 	@echo gen       - regenerate code: sqlc queries, Go server and TS client from openapi.yaml
 	@echo build     - production build of frontend and backend
+	@echo preview   - build frontend, serve it from Go on :8080 (PWA/offline active)
 	@echo test      - run all tests
 	@echo check     - vet + tests + typecheck, same as CI
 
@@ -42,6 +43,13 @@ gen:
 build:
 	npm --prefix frontend run build
 	go -C backend build -o ../bin/server ./cmd/server
+
+# Production-like run on :8080: Go serves the built frontend, and the
+# service worker (offline mode, install prompt) is active — unlike `make web`.
+preview: export STATIC_DIR = $(CURDIR)/frontend/dist
+preview:
+	npm --prefix frontend run build
+	go -C backend run ./cmd/server
 
 test:
 	go -C backend test ./...

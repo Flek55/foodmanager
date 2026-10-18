@@ -7,7 +7,6 @@ import {
   useCreateStore,
   useDeleteCategory,
   useDeleteStore,
-  useList,
   useRenameStore,
   useReorderCategories,
   useUpdateCategory,
@@ -15,25 +14,27 @@ import {
 import { useShell } from "../components/AppShell";
 import { Button, Card, ErrorBanner, FullScreenSpinner } from "../components/ui";
 import { toast } from "../lib/toast";
+import { useListSync } from "../sync/useListSync";
 
 /** Stores and categories of the current household. */
 export function CatalogPage() {
   const { household } = useShell();
-  const list = useList(household.id);
+  const { snapshot, status } = useListSync(household.id);
 
   return (
     <div className="space-y-4 pt-1">
       <Link to="/" className="inline-flex items-center gap-1 text-sm font-medium text-muted">
         <ArrowLeft className="size-4" /> К списку
       </Link>
-      {list.isPending ? (
+      {!status.online && (
+        <ErrorBanner message="Нет связи: магазины и категории можно менять только онлайн." />
+      )}
+      {!snapshot ? (
         <FullScreenSpinner />
-      ) : list.isError ? (
-        <ErrorBanner message={list.error.message} />
       ) : (
         <>
-          <StoresCard householdId={household.id} stores={list.data.stores} />
-          <CategoriesCard householdId={household.id} categories={list.data.categories} />
+          <StoresCard householdId={household.id} stores={snapshot.stores} />
+          <CategoriesCard householdId={household.id} categories={snapshot.categories} />
         </>
       )}
     </div>

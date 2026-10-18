@@ -318,6 +318,26 @@ type StoreInput struct {
 	Name string `json:"name"`
 }
 
+// SyncResponse defines model for SyncResponse.
+type SyncResponse struct {
+	Categories []Category `json:"categories"`
+
+	// Deleted Id записей, удалённых после `since`
+	Deleted  Tombstones `json:"deleted"`
+	Items    []ListItem `json:"items"`
+	Products []Product  `json:"products"`
+	Stores   []Store    `json:"stores"`
+	Version  int64      `json:"version"`
+}
+
+// Tombstones Id записей, удалённых после `since`
+type Tombstones struct {
+	Categories []openapi_types.UUID `json:"categories"`
+	Items      []openapi_types.UUID `json:"items"`
+	Products   []openapi_types.UUID `json:"products"`
+	Stores     []openapi_types.UUID `json:"stores"`
+}
+
 // Unit Единица количества: штуки, килограммы, граммы, литры, миллилитры, упаковки
 type Unit string
 
@@ -368,6 +388,11 @@ type TooManyRequests = Error
 
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
+
+// SyncListParams defines parameters for SyncList.
+type SyncListParams struct {
+	Since int64 `form:"since" json:"since"`
+}
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
@@ -482,6 +507,9 @@ type ServerInterface interface {
 	// UpdateStore Переименовать магазин
 	// (PUT /households/{householdId}/stores/{storeId})
 	UpdateStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId, storeId openapi_types.UUID)
+	// SyncList Изменения списка после версии `since` (для офлайн-клиента)
+	// (GET /households/{householdId}/sync)
+	SyncList(w http.ResponseWriter, r *http.Request, householdId HouseholdId, params SyncListParams)
 	// PreviewInvite Куда приглашает код (можно без входа)
 	// (GET /invites/{code})
 	PreviewInvite(w http.ResponseWriter, r *http.Request, code InviteCode)
@@ -638,6 +666,12 @@ func (_ Unimplemented) DeleteStore(w http.ResponseWriter, r *http.Request, house
 // UpdateStore Переименовать магазин
 // (PUT /households/{householdId}/stores/{storeId})
 func (_ Unimplemented) UpdateStore(w http.ResponseWriter, r *http.Request, householdId HouseholdId, storeId openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SyncList Изменения списка после версии `since` (для офлайн-клиента)
+// (GET /households/{householdId}/sync)
+func (_ Unimplemented) SyncList(w http.ResponseWriter, r *http.Request, householdId HouseholdId, params SyncListParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1313,6 +1347,48 @@ func (siw *ServerInterfaceWrapper) UpdateStore(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// SyncList operation middleware
+func (siw *ServerInterfaceWrapper) SyncList(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "householdId" -------------
+	var householdId HouseholdId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "householdId", chi.URLParam(r, "householdId"), &householdId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "householdId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SyncListParams
+
+	// ------------- Required query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SyncList(w, r, householdId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PreviewInvite operation middleware
 func (siw *ServerInterfaceWrapper) PreviewInvite(w http.ResponseWriter, r *http.Request) {
 
@@ -1536,6 +1612,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/households/{householdId}/list", wrapper.GetList)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/households/{householdId}/sync", wrapper.SyncList)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/households/{householdId}/items", wrapper.AddItem)
@@ -3008,6 +3087,71 @@ func (response UpdateStore404JSONResponse) VisitUpdateStoreResponse(w http.Respo
 	return err
 }
 
+type SyncListRequestObject struct {
+	HouseholdId HouseholdId `json:"householdId"`
+	Params      SyncListParams
+}
+
+type SyncListResponseObject interface {
+	VisitSyncListResponse(w http.ResponseWriter) error
+}
+
+type SyncList200JSONResponse SyncResponse
+
+func (response SyncList200JSONResponse) VisitSyncListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncList400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response SyncList400JSONResponse) VisitSyncListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncList401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response SyncList401JSONResponse) VisitSyncListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncList404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SyncList404JSONResponse) VisitSyncListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type PreviewInviteRequestObject struct {
 	Code InviteCode `json:"code"`
 }
@@ -3231,6 +3375,9 @@ type StrictServerInterface interface {
 	// UpdateStore Переименовать магазин
 	// (PUT /households/{householdId}/stores/{storeId})
 	UpdateStore(ctx context.Context, request UpdateStoreRequestObject) (UpdateStoreResponseObject, error)
+	// SyncList Изменения списка после версии `since` (для офлайн-клиента)
+	// (GET /households/{householdId}/sync)
+	SyncList(ctx context.Context, request SyncListRequestObject) (SyncListResponseObject, error)
 	// PreviewInvite Куда приглашает код (можно без входа)
 	// (GET /invites/{code})
 	PreviewInvite(ctx context.Context, request PreviewInviteRequestObject) (PreviewInviteResponseObject, error)
@@ -3991,6 +4138,33 @@ func (sh *strictHandler) UpdateStore(w http.ResponseWriter, r *http.Request, hou
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateStoreResponseObject); ok {
 		if err := validResponse.VisitUpdateStoreResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SyncList operation middleware
+func (sh *strictHandler) SyncList(w http.ResponseWriter, r *http.Request, householdId HouseholdId, params SyncListParams) {
+	var request SyncListRequestObject
+
+	request.HouseholdId = householdId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SyncList(ctx, request.(SyncListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SyncList")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SyncListResponseObject); ok {
+		if err := validResponse.VisitSyncListResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

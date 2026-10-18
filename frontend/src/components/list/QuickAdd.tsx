@@ -1,8 +1,8 @@
 import { Plus } from "lucide-react";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import type { Schemas } from "../../api/client";
-import { useAddItem } from "../../api/list";
 import { toast } from "../../lib/toast";
+import type { ListSync } from "../../sync/engine";
 import { formatQuantity, parseQuickAdd, searchable } from "../../lib/units";
 import { newId } from "../../lib/uuid";
 
@@ -11,21 +11,22 @@ const MAX_SUGGESTIONS = 6;
 /**
  * The input at the top of the list. Type "молоко 2л" + Enter to add; while
  * typing, products the family bought before are suggested (searched locally,
- * so it's instant and will work offline).
+ * so it's instant and works offline).
  */
 export function QuickAdd({
-  householdId,
+  sync,
   snapshot,
   storeId,
+  userName,
 }: {
-  householdId: string;
+  sync: ListSync;
   snapshot: Schemas["ListSnapshot"];
   storeId: string | null;
+  userName: string;
 }) {
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const add = useAddItem(householdId);
 
   const parsed = parseQuickAdd(text);
   const emoji = useMemo(
@@ -53,21 +54,16 @@ export function QuickAdd({
 
   const submit = (name: string, unitFallback?: Schemas["Unit"]) => {
     if (!name.trim()) return;
-    add.mutate(
-      {
-        id: newId(),
-        name,
-        quantity: parsed.quantity,
-        unit: parsed.quantity !== undefined ? (parsed.unit ?? unitFallback) : undefined,
-        storeId: storeId ?? undefined,
-      },
-      {
-        onSuccess: ({ item, created }) => {
-          if (!created) toast(`«${item.name}» уже в списке — обновили`);
-        },
-        onError: (err) => toast(err.message),
-      },
-    );
+    // Applied locally at once; sent to the server when there's a connection.
+    const { merged } = sync.addItem({
+      id: newId(),
+      name,
+      quantity: parsed.quantity,
+      unit: parsed.quantity !== undefined ? (parsed.unit ?? unitFallback) : undefined,
+      storeId: storeId ?? undefined,
+      by: userName,
+    });
+    if (merged) toast(`«${name.trim()}» уже в списке — обновили`);
     setText("");
     inputRef.current?.focus(); // keep the keyboard open for the next item
   };

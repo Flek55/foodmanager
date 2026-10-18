@@ -27,6 +27,7 @@ make web                    # фронт на http://127.0.0.1:5173
 
 | Команда | Что делает |
 |---|---|
+| `make preview` | собрать фронт и отдать его из Go на :8080 — так работают офлайн и установка (PWA) |
 | `make gen` | перегенерировать код после правки `api/openapi.yaml` |
 | `make check` | vet, тесты, проверка типов (то же, что в CI) |
 | `make db-psql` | консоль psql в dev-базе |
@@ -58,8 +59,10 @@ backend/
   internal/config/        настройки из env
   internal/db/            пул соединений, миграции
   internal/testdb/        временная Postgres-база для тестов
+frontend/public/          sw.js (service worker), manifest, иконки
 frontend/src/
   api/                    типизированный клиент, хуки TanStack Query
+  sync/                   офлайн-движок списка: очередь, IndexedDB, дельта-синхронизация
   components/             UI-примитивы, каркас приложения, проверка входа
   pages/                  экраны
   lib/                    мелкие утилиты

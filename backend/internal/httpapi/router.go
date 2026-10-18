@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -97,15 +98,30 @@ func writeAppError(w http.ResponseWriter, err error) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
+func init() {
+	// Not in Go's built-in table; browsers want this type for PWA manifests.
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
+
 // spaHandler serves files from dir and falls back to index.html for unknown
 // paths, so client-side routes like /list/123 survive a page reload.
+//
+// Caching: /assets/* have content hashes in their names (Vite), so they are
+// cached forever; everything else (index.html, sw.js, manifest, icons) is
+// revalidated on every load, so new deploys reach users immediately.
 func spaHandler(dir string) http.Handler {
 	files := http.FileServer(http.Dir(dir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := filepath.Join(dir, filepath.FromSlash(strings.TrimPrefix(r.URL.Path, "/")))
 		if info, err := os.Stat(path); err != nil || info.IsDir() {
+			w.Header().Set("Cache-Control", "no-cache")
 			http.ServeFile(w, r, filepath.Join(dir, "index.html"))
 			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/assets/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
 		}
 		files.ServeHTTP(w, r)
 	})

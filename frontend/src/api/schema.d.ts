@@ -256,6 +256,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/households/{householdId}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Изменения списка после версии `since` (для офлайн-клиента)
+         * @description Возвращает всё, что изменилось с версии `since`: новые и изменённые
+         *     записи и id удалённых. Клиент применяет это к своему снимку и
+         *     запоминает новую `version`. Если `since` больше текущей версии
+         *     (например, база пересоздана), клиент должен заново загрузить /list.
+         */
+        get: operations["syncList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/households/{householdId}/items": {
         parameters: {
             query?: never;
@@ -609,6 +634,22 @@ export interface components {
             products: components["schemas"]["Product"][];
             categories: components["schemas"]["Category"][];
             stores: components["schemas"]["Store"][];
+        };
+        SyncResponse: {
+            /** Format: int64 */
+            version: number;
+            items: components["schemas"]["ListItem"][];
+            products: components["schemas"]["Product"][];
+            categories: components["schemas"]["Category"][];
+            stores: components["schemas"]["Store"][];
+            deleted: components["schemas"]["Tombstones"];
+        };
+        /** @description Id записей, удалённых после `since` */
+        Tombstones: {
+            items: string[];
+            products: string[];
+            categories: string[];
+            stores: string[];
         };
         AddItemRequest: {
             /**
@@ -1108,6 +1149,33 @@ export interface operations {
                     "application/json": components["schemas"]["ListSnapshot"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    syncList: {
+        parameters: {
+            query: {
+                since: number;
+            };
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

@@ -470,6 +470,47 @@ func (q *Queries) ListCategories(ctx context.Context, householdID uuid.UUID) ([]
 	return items, nil
 }
 
+const listCategoriesSince = `-- name: ListCategoriesSince :many
+SELECT id, household_id, key, name, emoji, sort_order, version, created_at, updated_at, deleted_at FROM categories
+WHERE household_id = $1 AND deleted_at IS NULL AND version > $2
+`
+
+type ListCategoriesSinceParams struct {
+	HouseholdID uuid.UUID
+	Since       int64
+}
+
+func (q *Queries) ListCategoriesSince(ctx context.Context, arg ListCategoriesSinceParams) ([]Category, error) {
+	rows, err := q.db.Query(ctx, listCategoriesSince, arg.HouseholdID, arg.Since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Category{}
+	for rows.Next() {
+		var i Category
+		if err := rows.Scan(
+			&i.ID,
+			&i.HouseholdID,
+			&i.Key,
+			&i.Name,
+			&i.Emoji,
+			&i.SortOrder,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listItemViews = `-- name: ListItemViews :many
 SELECT
     i.id, i.product_id, p.name, p.description, p.category_id,
@@ -484,12 +525,14 @@ LEFT JOIN users cu ON cu.id = i.checked_by
 WHERE i.household_id = $1
   AND i.deleted_at IS NULL
   AND ($2::uuid IS NULL OR i.id = $2::uuid)
+  AND ($3::bigint IS NULL OR i.version > $3::bigint)
 ORDER BY i.created_at, i.id
 `
 
 type ListItemViewsParams struct {
 	HouseholdID uuid.UUID
 	ItemID      *uuid.UUID
+	Since       *int64
 }
 
 type ListItemViewsRow struct {
@@ -509,9 +552,9 @@ type ListItemViewsRow struct {
 }
 
 // Items as the UI shows them: joined with their product and people's names.
-// Pass item_id to fetch a single item, or NULL for the whole list.
+// Filters are optional: item_id for a single item, since for delta sync.
 func (q *Queries) ListItemViews(ctx context.Context, arg ListItemViewsParams) ([]ListItemViewsRow, error) {
-	rows, err := q.db.Query(ctx, listItemViews, arg.HouseholdID, arg.ItemID)
+	rows, err := q.db.Query(ctx, listItemViews, arg.HouseholdID, arg.ItemID, arg.Since)
 	if err != nil {
 		return nil, err
 	}
@@ -585,6 +628,51 @@ func (q *Queries) ListProducts(ctx context.Context, householdID uuid.UUID) ([]Pr
 	return items, nil
 }
 
+const listProductsSince = `-- name: ListProductsSince :many
+
+SELECT id, household_id, name, description, category_id, default_store_id, default_unit, use_count, version, created_at, updated_at, deleted_at FROM products
+WHERE household_id = $1 AND deleted_at IS NULL AND version > $2
+`
+
+type ListProductsSinceParams struct {
+	HouseholdID uuid.UUID
+	Since       int64
+}
+
+// ---- Delta sync ----
+func (q *Queries) ListProductsSince(ctx context.Context, arg ListProductsSinceParams) ([]Product, error) {
+	rows, err := q.db.Query(ctx, listProductsSince, arg.HouseholdID, arg.Since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Product{}
+	for rows.Next() {
+		var i Product
+		if err := rows.Scan(
+			&i.ID,
+			&i.HouseholdID,
+			&i.Name,
+			&i.Description,
+			&i.CategoryID,
+			&i.DefaultStoreID,
+			&i.DefaultUnit,
+			&i.UseCount,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listStores = `-- name: ListStores :many
 SELECT id, household_id, name, sort_order, version, created_at, updated_at, deleted_at FROM stores
 WHERE household_id = $1 AND deleted_at IS NULL
@@ -610,6 +698,89 @@ func (q *Queries) ListStores(ctx context.Context, householdID uuid.UUID) ([]Stor
 			&i.UpdatedAt,
 			&i.DeletedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStoresSince = `-- name: ListStoresSince :many
+SELECT id, household_id, name, sort_order, version, created_at, updated_at, deleted_at FROM stores
+WHERE household_id = $1 AND deleted_at IS NULL AND version > $2
+`
+
+type ListStoresSinceParams struct {
+	HouseholdID uuid.UUID
+	Since       int64
+}
+
+func (q *Queries) ListStoresSince(ctx context.Context, arg ListStoresSinceParams) ([]Store, error) {
+	rows, err := q.db.Query(ctx, listStoresSince, arg.HouseholdID, arg.Since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Store{}
+	for rows.Next() {
+		var i Store
+		if err := rows.Scan(
+			&i.ID,
+			&i.HouseholdID,
+			&i.Name,
+			&i.SortOrder,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTombstonesSince = `-- name: ListTombstonesSince :many
+SELECT 'item'::text AS kind, i.id FROM list_items AS i
+WHERE i.household_id = $1::uuid AND i.deleted_at IS NOT NULL AND i.version > $2::bigint
+UNION ALL
+SELECT 'product', p.id FROM products AS p
+WHERE p.household_id = $1::uuid AND p.deleted_at IS NOT NULL AND p.version > $2::bigint
+UNION ALL
+SELECT 'category', c.id FROM categories AS c
+WHERE c.household_id = $1::uuid AND c.deleted_at IS NOT NULL AND c.version > $2::bigint
+UNION ALL
+SELECT 'store', s.id FROM stores AS s
+WHERE s.household_id = $1::uuid AND s.deleted_at IS NOT NULL AND s.version > $2::bigint
+`
+
+type ListTombstonesSinceParams struct {
+	HouseholdID uuid.UUID
+	Since       int64
+}
+
+type ListTombstonesSinceRow struct {
+	Kind string
+	ID   uuid.UUID
+}
+
+func (q *Queries) ListTombstonesSince(ctx context.Context, arg ListTombstonesSinceParams) ([]ListTombstonesSinceRow, error) {
+	rows, err := q.db.Query(ctx, listTombstonesSince, arg.HouseholdID, arg.Since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTombstonesSinceRow{}
+	for rows.Next() {
+		var i ListTombstonesSinceRow
+		if err := rows.Scan(&i.Kind, &i.ID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -887,6 +1058,43 @@ func (q *Queries) SoftDeleteStore(ctx context.Context, arg SoftDeleteStoreParams
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const touchItemsOfCategory = `-- name: TouchItemsOfCategory :exec
+UPDATE list_items AS i SET version = $1
+WHERE i.household_id = $2 AND i.deleted_at IS NULL
+  AND i.product_id IN (SELECT p.id FROM products AS p WHERE p.category_id = $3)
+`
+
+type TouchItemsOfCategoryParams struct {
+	Version     int64
+	HouseholdID uuid.UUID
+	CategoryID  *uuid.UUID
+}
+
+// Same, for every item whose product is in the category (call before
+// detaching the category from products).
+func (q *Queries) TouchItemsOfCategory(ctx context.Context, arg TouchItemsOfCategoryParams) error {
+	_, err := q.db.Exec(ctx, touchItemsOfCategory, arg.Version, arg.HouseholdID, arg.CategoryID)
+	return err
+}
+
+const touchItemsOfProduct = `-- name: TouchItemsOfProduct :exec
+UPDATE list_items SET version = $1
+WHERE household_id = $2 AND product_id = $3 AND deleted_at IS NULL
+`
+
+type TouchItemsOfProductParams struct {
+	Version     int64
+	HouseholdID uuid.UUID
+	ProductID   uuid.UUID
+}
+
+// Item rows embed product fields (name, category), so a product change must
+// also bump its items' version, or delta sync would miss it.
+func (q *Queries) TouchItemsOfProduct(ctx context.Context, arg TouchItemsOfProductParams) error {
+	_, err := q.db.Exec(ctx, touchItemsOfProduct, arg.Version, arg.HouseholdID, arg.ProductID)
+	return err
 }
 
 const updateCategory = `-- name: UpdateCategory :one

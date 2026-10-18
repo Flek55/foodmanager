@@ -42,6 +42,16 @@ func NotFound(message string) *Error {
 	return &Error{Kind: KindNotFound, Code: "not_found", Message: message}
 }
 
+// NotFoundCode is NotFound with a specific code, for when clients must tell
+// apart what is missing (e.g. an item vs. access to the whole household).
+func NotFoundCode(code, message string) *Error {
+	return &Error{Kind: KindNotFound, Code: code, Message: message}
+}
+
+// CodeHouseholdNotFound means the household doesn't exist or the user isn't
+// a member (we deliberately don't say which).
+const CodeHouseholdNotFound = "household_not_found"
+
 func Conflict(code, message string) *Error {
 	return &Error{Kind: KindConflict, Code: code, Message: message}
 }

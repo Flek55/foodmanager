@@ -6,6 +6,7 @@
 // invalidate the cached keys so every screen shows fresh data.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { resetSync } from "../sync/engine";
 import { api, isApiError, unwrap, type Schemas } from "./client";
 
 export const keys = {
@@ -53,10 +54,17 @@ export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => unwrap(api.POST("/auth/logout")),
-    onSettled: () => {
-      // Drop everything cached for the previous user.
+    onSettled: async () => {
+      // Forget everything stored on this device for the previous user:
+      // cached queries, the offline list and its unsent changes.
       qc.clear();
       qc.setQueryData(keys.me, null);
+      await resetSync();
+      try {
+        for (const key of Object.keys(localStorage)) if (key.startsWith("fm.")) localStorage.removeItem(key);
+      } catch {
+        // storage unavailable: nothing to clean
+      }
     },
   });
 }

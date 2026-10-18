@@ -279,6 +279,66 @@ func TestVersionGrowsWithEveryWrite(t *testing.T) {
 	}
 }
 
+func TestChangesSince(t *testing.T) {
+	f := setup(t)
+	milk := f.add(t, AddItemInput{Name: "Молоко"})
+	bread := f.add(t, AddItemInput{Name: "Хлеб"})
+	base, _ := f.svc.Snapshot(f.ctx, f.user, f.household)
+
+	d, err := f.svc.Changes(f.ctx, f.user, f.household, base.Version)
+	if err != nil || d.Version != base.Version || len(d.Items) != 0 {
+		t.Fatalf("no changes expected: %+v %v", d, err)
+	}
+
+	// Rename the product of a CHECKED item through another, active item of
+	// the same product: the checked item must show up in the delta too,
+	// since it embeds the product name.
+	if _, err := f.svc.SetChecked(f.ctx, f.user, f.household, milk.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	milk2 := f.add(t, AddItemInput{Name: "Молоко"})
+	mid, _ := f.svc.CurrentVersion(f.ctx, f.user, f.household)
+	if _, err := f.svc.UpdateItem(f.ctx, f.user, f.household, milk2.ID, UpdateItemInput{Name: "Молоко 2,5%"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.DeleteItem(f.ctx, f.user, f.household, bread.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	d, err = f.svc.Changes(f.ctx, f.user, f.household, mid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[uuid.UUID]string{}
+	for _, it := range d.Items {
+		names[it.ID] = it.Name
+	}
+	if names[milk.ID] != "Молоко 2,5%" || names[milk2.ID] != "Молоко 2,5%" {
+		t.Fatalf("both milk items must carry the new name: %v", names)
+	}
+	if len(d.Deleted.Items) != 1 || d.Deleted.Items[0] != bread.ID {
+		t.Fatalf("bread tombstone missing: %+v", d.Deleted)
+	}
+	if len(d.Products) != 1 || len(d.Categories) != 0 {
+		t.Fatalf("unexpected delta: %d products, %d categories", len(d.Products), len(d.Categories))
+	}
+
+	// Deleting a category re-sends the items that lost it. (The milk product
+	// has no category any more: the PUT above omitted categoryId.)
+	kefir := f.add(t, AddItemInput{Name: "Кефир"})
+	before, _ := f.svc.CurrentVersion(f.ctx, f.user, f.household)
+	if err := f.svc.DeleteCategory(f.ctx, f.user, f.household, *kefir.CategoryID); err != nil {
+		t.Fatal(err)
+	}
+	d, _ = f.svc.Changes(f.ctx, f.user, f.household, before)
+	if len(d.Items) != 1 || d.Items[0].ID != kefir.ID || d.Items[0].CategoryID != nil || len(d.Deleted.Categories) != 1 {
+		t.Fatalf("category delete delta: %+v, %+v", d.Items, d.Deleted)
+	}
+
+	_, err = f.svc.Changes(f.ctx, f.user, f.household, -1)
+	assertKind(t, err, apperr.KindInvalid)
+}
+
 func TestNonMemberIsRejected(t *testing.T) {
 	f := setup(t)
 	stranger := uuid.Must(uuid.NewV7())

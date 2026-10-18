@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	errHouseholdNotFound = apperr.NotFound("семья не найдена")
-	errItemNotFound      = apperr.NotFound("позиция не найдена — возможно, её уже удалили")
+	errHouseholdNotFound = apperr.NotFoundCode(apperr.CodeHouseholdNotFound, "семья не найдена")
+	errItemNotFound      = apperr.NotFoundCode("item_not_found", "позиция не найдена — возможно, её уже удалили")
 	errStoreNotFound     = apperr.NotFound("магазин не найден")
 	errCategoryNotFound  = apperr.NotFound("категория не найдена")
 )
@@ -73,6 +73,79 @@ func (s *Service) Snapshot(ctx context.Context, userID, householdID uuid.UUID) (
 		return err
 	})
 	return snap, err
+}
+
+// Delta is what changed after a given version: live rows that were created
+// or updated, plus ids of rows that were deleted.
+type Delta struct {
+	Version    int64
+	Items      []store.ListItemViewsRow
+	Products   []store.Product
+	Categories []store.Category
+	Stores     []store.Store
+	Deleted    Tombstones
+}
+
+type Tombstones struct {
+	Items, Products, Categories, Stores []uuid.UUID
+}
+
+// Changes returns everything that changed after version since. A client that
+// applies it to its snapshot at `since` ends up exactly at Delta.Version.
+func (s *Service) Changes(ctx context.Context, userID, householdID uuid.UUID, since int64) (Delta, error) {
+	// Empty (not nil) slices, so the JSON has [] rather than null.
+	d := Delta{
+		Items: []store.ListItemViewsRow{}, Products: []store.Product{},
+		Categories: []store.Category{}, Stores: []store.Store{},
+		Deleted: Tombstones{Items: []uuid.UUID{}, Products: []uuid.UUID{}, Categories: []uuid.UUID{}, Stores: []uuid.UUID{}},
+	}
+	if since < 0 {
+		return d, apperr.Invalid("since", "версия не может быть отрицательной")
+	}
+	opts := pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly}
+	err := pgx.BeginTxFunc(ctx, s.pool, opts, func(tx pgx.Tx) error {
+		q := s.q.WithTx(tx)
+		if err := requireMember(ctx, q, userID, householdID); err != nil {
+			return err
+		}
+		var err error
+		if d.Version, err = q.GetHouseholdVersion(ctx, householdID); err != nil {
+			return err
+		}
+		if since >= d.Version {
+			return nil // nothing new (or the client is ahead: it will reload)
+		}
+		if d.Items, err = q.ListItemViews(ctx, store.ListItemViewsParams{HouseholdID: householdID, Since: &since}); err != nil {
+			return err
+		}
+		if d.Products, err = q.ListProductsSince(ctx, store.ListProductsSinceParams{HouseholdID: householdID, Since: since}); err != nil {
+			return err
+		}
+		if d.Categories, err = q.ListCategoriesSince(ctx, store.ListCategoriesSinceParams{HouseholdID: householdID, Since: since}); err != nil {
+			return err
+		}
+		if d.Stores, err = q.ListStoresSince(ctx, store.ListStoresSinceParams{HouseholdID: householdID, Since: since}); err != nil {
+			return err
+		}
+		tombs, err := q.ListTombstonesSince(ctx, store.ListTombstonesSinceParams{HouseholdID: householdID, Since: since})
+		if err != nil {
+			return err
+		}
+		for _, t := range tombs {
+			switch t.Kind {
+			case "item":
+				d.Deleted.Items = append(d.Deleted.Items, t.ID)
+			case "product":
+				d.Deleted.Products = append(d.Deleted.Products, t.ID)
+			case "category":
+				d.Deleted.Categories = append(d.Deleted.Categories, t.ID)
+			case "store":
+				d.Deleted.Stores = append(d.Deleted.Stores, t.ID)
+			}
+		}
+		return nil
+	})
+	return d, err
 }
 
 // CurrentVersion returns the household's data version, checking membership.
@@ -174,8 +247,13 @@ func (s *Service) findOrCreateProduct(ctx context.Context, q *store.Queries, hou
 	product, err := q.GetProductByName(ctx, store.GetProductByNameParams{HouseholdID: householdID, Name: name})
 	if err == nil {
 		if categoryID != nil && (product.CategoryID == nil || *product.CategoryID != *categoryID) {
-			err = q.SetProductCategory(ctx, store.SetProductCategoryParams{
+			if err := q.SetProductCategory(ctx, store.SetProductCategoryParams{
 				CategoryID: categoryID, Version: version, HouseholdID: householdID, ID: product.ID,
+			}); err != nil {
+				return product, err
+			}
+			err = q.TouchItemsOfProduct(ctx, store.TouchItemsOfProductParams{
+				Version: version, HouseholdID: householdID, ProductID: product.ID,
 			})
 		}
 		return product, err
@@ -262,6 +340,12 @@ func (s *Service) UpdateItem(ctx context.Context, userID, householdID, itemID uu
 		if err := q.UpdateProduct(ctx, store.UpdateProductParams{
 			Name: name, Description: description, CategoryID: in.CategoryID,
 			Version: version, HouseholdID: householdID, ID: productID,
+		}); err != nil {
+			return err
+		}
+		// Other items of this product (e.g. bought ones) show its name too.
+		if err := q.TouchItemsOfProduct(ctx, store.TouchItemsOfProductParams{
+			Version: version, HouseholdID: householdID, ProductID: productID,
 		}); err != nil {
 			return err
 		}
@@ -450,6 +534,12 @@ func (s *Service) DeleteCategory(ctx context.Context, userID, householdID, categ
 		}
 		if n == 0 {
 			return errCategoryNotFound
+		}
+		// Bump items first: after detaching we could no longer find them.
+		if err := q.TouchItemsOfCategory(ctx, store.TouchItemsOfCategoryParams{
+			Version: version, HouseholdID: householdID, CategoryID: &categoryID,
+		}); err != nil {
+			return err
 		}
 		return q.DetachCategoryFromProducts(ctx, store.DetachCategoryFromProductsParams{
 			Version: version, HouseholdID: householdID, CategoryID: &categoryID,
