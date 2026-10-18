@@ -17,12 +17,21 @@ import (
 	"foodmanager/internal/apperr"
 )
 
+type RouterOptions struct {
+	// StaticDir, if set, is served as the SPA.
+	StaticDir string
+	// TrustProxy: read the client IP from proxy headers (see config).
+	TrustProxy bool
+}
+
 // NewRouter wires middleware, the generated API routes under /api and,
-// optionally, the built SPA from staticDir.
-func NewRouter(h *Handler, log *slog.Logger, staticDir string) http.Handler {
+// optionally, the built SPA.
+func NewRouter(h *Handler, log *slog.Logger, opts RouterOptions) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
+	if opts.TrustProxy {
+		r.Use(middleware.RealIP)
+	}
 	r.Use(requestLogger(log))
 	r.Use(middleware.Recoverer)
 	// Rejects cross-site state-changing requests (CSRF) using the
@@ -60,8 +69,8 @@ func NewRouter(h *Handler, log *slog.Logger, staticDir string) http.Handler {
 		writeAppError(w, apperr.NotFound("эндпоинт не найден"))
 	})
 
-	if staticDir != "" {
-		r.Handle("/*", spaHandler(staticDir))
+	if opts.StaticDir != "" {
+		r.Handle("/*", spaHandler(opts.StaticDir))
 	}
 	return r
 }

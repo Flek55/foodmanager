@@ -39,6 +39,15 @@ jobs:
       - run: go -C backend test ./...
       - run: go -C backend build ./cmd/server
 
+  docker:
+    # The exact image the server builds: catches a broken Dockerfile before
+    # it reaches deploy/update.sh.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build production image
+        run: docker build --build-arg VERSION="${GITHUB_SHA::7}" -t foodmanager:ci .
+
   frontend:
     runs-on: ubuntu-latest
     steps:

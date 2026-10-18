@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -26,10 +27,36 @@ import (
 var version = "dev"
 
 func main() {
+	// `server -healthcheck` is used by Docker's HEALTHCHECK: the runtime
+	// image is distroless (no shell, no curl), so the binary checks itself.
+	if len(os.Args) > 1 && os.Args[1] == "-healthcheck" {
+		os.Exit(healthcheck())
+	}
 	if err := run(); err != nil {
 		slog.Error("server stopped", "err", err)
 		os.Exit(1)
 	}
+}
+
+func healthcheck() int {
+	cfg, err := config.Load()
+	if err != nil {
+		return 1
+	}
+	_, port, err := net.SplitHostPort(cfg.HTTPAddr)
+	if err != nil {
+		return 1
+	}
+	client := http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:" + port + "/api/health")
+	if err != nil {
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }
 
 func run() error {
@@ -68,13 +95,16 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewRouter(handler, log, cfg.StaticDir),
+		Handler:           httpapi.NewRouter(handler, log, httpapi.RouterOptions{StaticDir: cfg.StaticDir, TrustProxy: cfg.TrustProxy}),
 		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+		// No WriteTimeout on purpose: it would cut SSE streams, which stay
+		// open indefinitely. Slow clients are bounded by the proxy instead.
 	}
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("http server listening", "addr", cfg.HTTPAddr, "env", cfg.Env, "version", version)
+		log.Info("http server listening", "addr", cfg.HTTPAddr, "env", cfg.Env, "version", version, "trust_proxy", cfg.TrustProxy)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}

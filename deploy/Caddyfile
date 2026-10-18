@@ -1,0 +1,27 @@
+# Caddy: HTTPS termination (automatic Let's Encrypt certificates) and
+# reverse proxy to the app. DOMAIN and ACME_EMAIL come from deploy/.env.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	# Compress everything except the SSE stream: a compressor buffers
+	# output, which would delay live updates.
+	@compressible not path /api/households/*/events
+	encode @compressible zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy app:8080 {
+		# The app trusts X-Real-IP for rate limiting (TRUST_PROXY=true), so
+		# always overwrite it with the real peer address and drop the other
+		# client-IP header chi would look at; clients can't fake either.
+		header_up X-Real-IP {remote_host}
+		header_up -True-Client-IP
+	}
+}

@@ -7,6 +7,9 @@ frontend/dist/
 # Dependencies
 frontend/node_modules/
 
+# Database dumps made on the server
+deploy/backups/
+
 # Local config and secrets
 .env
 .env.*

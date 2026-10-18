@@ -19,6 +19,10 @@ type Config struct {
 	// StaticDir, if set, is served as the SPA (built frontend). Empty in dev,
 	// where Vite serves the frontend and proxies /api to us.
 	StaticDir string
+	// TrustProxy: take the client IP from X-Real-IP / X-Forwarded-For.
+	// Enable ONLY behind a reverse proxy that sets these headers (Caddy in
+	// prod); otherwise any client could fake its IP to dodge rate limits.
+	TrustProxy bool
 	// ShutdownTimeout bounds graceful shutdown.
 	ShutdownTimeout time.Duration
 }
@@ -29,6 +33,7 @@ func Load() (Config, error) {
 		HTTPAddr:        getenv("HTTP_ADDR", ":8080"),
 		DatabaseURL:     getenv("DATABASE_URL", "postgres://foodmanager:foodmanager@localhost:5433/foodmanager?sslmode=disable"),
 		StaticDir:       os.Getenv("STATIC_DIR"),
+		TrustProxy:      os.Getenv("TRUST_PROXY") == "true",
 		ShutdownTimeout: 10 * time.Second,
 	}
 	if cfg.Env != "dev" && cfg.Env != "prod" {

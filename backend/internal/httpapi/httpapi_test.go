@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -37,7 +38,7 @@ func newServer(t *testing.T) string {
 		Hub:        hub,
 		Version:    "test",
 	})
-	srv := httptest.NewServer(NewRouter(h, slog.New(slog.DiscardHandler), ""))
+	srv := httptest.NewServer(NewRouter(h, slog.New(slog.DiscardHandler), RouterOptions{}))
 	t.Cleanup(srv.Close)
 	return srv.URL
 }
@@ -153,6 +154,29 @@ func TestCrossSiteRequestRejected(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("cross-site POST must be rejected, got %d", resp.StatusCode)
+	}
+}
+
+// Without TRUST_PROXY, a client can't dodge the limiter by inventing a new
+// IP for every attempt.
+func TestSpoofedIPHeadersIgnoredByDefault(t *testing.T) {
+	c := newClient(t, newServer(t))
+	last := 0
+	for i := range 11 {
+		req, _ := http.NewRequest("POST", c.base+"/api/auth/login",
+			bytes.NewBufferString(`{"email":"x@example.com","password":"password123"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Real-IP", fmt.Sprintf("10.0.0.%d", i))
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("10.0.1.%d", i))
+		resp, err := c.http.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		last = resp.StatusCode
+	}
+	if last != http.StatusTooManyRequests {
+		t.Fatalf("spoofed IP headers bypassed the rate limit: last status %d", last)
 	}
 }
 

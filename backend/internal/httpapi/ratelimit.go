@@ -61,8 +61,8 @@ func (l *ipLimiter) cleanupLoop() {
 }
 
 // rateLimitSensitive throttles endpoints open to guessing: password login,
-// registration and invite codes. r.RemoteAddr is already the client IP
-// thanks to middleware.RealIP (in prod we sit behind Caddy).
+// registration and invite codes. Behind a trusted proxy r.RemoteAddr is
+// already the real client IP (middleware.RealIP, enabled by TRUST_PROXY).
 func rateLimitSensitive(l *ipLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

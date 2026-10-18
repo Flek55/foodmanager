@@ -5,6 +5,7 @@
 и прогноз «пора купить» по истории покупок.
 
 Архитектура и план: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Деплой на свой сервер: [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Стек
 
@@ -66,5 +67,7 @@ frontend/src/
   components/             UI-примитивы, каркас приложения, проверка входа
   pages/                  экраны
   lib/                    мелкие утилиты
-docs/                     архитектура и решения
+deploy/                   прод: docker-compose (Caddy + app + Postgres + бэкапы), скрипты сервера
+Dockerfile                прод-образ: Go-бинарник + собранный фронт на distroless (~25 МБ)
+docs/                     архитектура, решения, инструкция по деплою
 ```
