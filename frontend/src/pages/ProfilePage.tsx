@@ -1,9 +1,22 @@
-import { LogOut, Share, Smartphone } from "lucide-react";
-import { isIOS, isStandalone, useInstallPrompt } from "../lib/install";
+import { useQueryClient } from "@tanstack/react-query";
+import { LogOut, Send, Share, Smartphone } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { useLogout } from "../api/hooks";
+import type { Schemas } from "../api/client";
+import {
+  keys,
+  useConfig,
+  useCreateTelegramLink,
+  useLinkTelegramWebApp,
+  useLogout,
+  useTelegramSettings,
+  useUnlinkTelegram,
+} from "../api/hooks";
 import { useShell } from "../components/AppShell";
 import { Avatar, Button, Card } from "../components/ui";
+import { isIOS, isStandalone, useInstallPrompt } from "../lib/install";
+import { isMiniApp, miniAppInitData, openTelegramLink } from "../lib/telegram";
+import { toast } from "../lib/toast";
 
 /** Offers to install the app on the home screen, the right way per platform. */
 function InstallCard() {
@@ -41,6 +54,106 @@ function InstallCard() {
   return null;
 }
 
+/** Linking Telegram: notifications, adding by message, the bot. */
+function TelegramCard({ me }: { me: Schemas["Me"] }) {
+  const qc = useQueryClient();
+  const config = useConfig();
+  const createLink = useCreateTelegramLink();
+  const linkWebApp = useLinkTelegramWebApp();
+  const unlink = useUnlinkTelegram();
+  const settings = useTelegramSettings();
+  const [waiting, setWaiting] = useState(false);
+  const bot = config.data?.telegramBot;
+  const tg = me.telegram;
+
+  // After opening the bot, re-check "me" until the link shows up.
+  useEffect(() => {
+    if (!waiting) return;
+    if (tg) {
+      setWaiting(false);
+      toast("Telegram подключён");
+      return;
+    }
+    const timer = setInterval(() => void qc.invalidateQueries({ queryKey: keys.me }), 3000);
+    const stop = setTimeout(() => setWaiting(false), 3 * 60_000);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(stop);
+    };
+  }, [waiting, tg, qc]);
+
+  if (!bot) return null;
+
+  if (!tg) {
+    const connect = () => {
+      const initData = miniAppInitData();
+      if (initData) {
+        // Inside Telegram we already know who this is: link directly.
+        linkWebApp.mutate(initData, { onSuccess: () => toast("Telegram подключён"), onError: (e) => toast(e.message) });
+        return;
+      }
+      createLink.mutate(undefined, {
+        onSuccess: (link) => {
+          openTelegramLink(link.url);
+          setWaiting(true);
+        },
+        onError: (e) => toast(e.message),
+      });
+    };
+    return (
+      <Card>
+        <p className="mb-1 flex items-center gap-2 font-semibold">
+          <Send className="size-5 text-accent" /> Telegram
+        </p>
+        <p className="mb-4 text-sm text-muted">
+          Бот пришлёт, что добавили в список и что закончилось дома. А покупки можно писать ему сообщением.
+        </p>
+        <Button block onClick={connect} loading={createLink.isPending || linkWebApp.isPending}>
+          {waiting ? "Ждём подтверждения в Telegram…" : "Подключить Telegram"}
+        </Button>
+      </Card>
+    );
+  }
+
+  const toggle = (key: "notifyAdded" | "notifyStock") =>
+    settings.mutate({ notifyAdded: tg.notifyAdded, notifyStock: tg.notifyStock, [key]: !tg[key] });
+
+  return (
+    <Card>
+      <p className="mb-1 flex items-center gap-2 font-semibold">
+        <Send className="size-5 text-accent" /> Telegram подключён
+      </p>
+      <p className="mb-3 text-sm text-muted">
+        {tg.username ? `@${tg.username}` : tg.firstName} ·{" "}
+        <a href={`https://t.me/${bot}`} target="_blank" rel="noreferrer" className="font-medium text-accent">
+          открыть бота
+        </a>
+      </p>
+      <div className="divide-y divide-line/60 rounded-xl border border-line">
+        <SettingRow label="Что добавили в список" checked={tg.notifyAdded} onChange={() => toggle("notifyAdded")} />
+        <SettingRow label="Что заканчивается дома" checked={tg.notifyStock} onChange={() => toggle("notifyStock")} />
+      </div>
+      <Button
+        variant="ghost"
+        className="mt-3"
+        loading={unlink.isPending}
+        onClick={() => confirm("Отключить Telegram? Уведомления перестанут приходить.") && unlink.mutate()}
+      >
+        Отключить
+      </Button>
+    </Card>
+  );
+}
+
+function SettingRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-[15px]">
+      {label}
+      <input type="checkbox" checked={checked} onChange={onChange} className="size-5 accent-(--color-accent)" />
+    </label>
+  );
+}
+
 export function ProfilePage() {
   const { me } = useShell();
   const logout = useLogout();
@@ -56,12 +169,9 @@ export function ProfilePage() {
         </div>
       </Card>
 
-      <InstallCard />
+      <TelegramCard me={me} />
 
-      <Card>
-        <h2 className="mb-1 font-semibold">Скоро здесь</h2>
-        <p className="text-sm text-muted">Вход через Google и Telegram, уведомления в Telegram-боте.</p>
-      </Card>
+      {!isMiniApp && <InstallCard />}
 
       <Button
         variant="secondary"

@@ -2,8 +2,11 @@
 //
 // It connects to TEST_DATABASE_URL (default: the dev Postgres from
 // docker-compose.yml), creates a uniquely named database, applies migrations
-// and drops it when the test ends. Without a reachable Postgres the test is
-// skipped locally but fails in CI (CI env var set), so it can't silently pass.
+// and drops it when the test ends.
+//
+// Without a reachable Postgres the test FAILS, so a stopped database can't
+// turn into a misleading green "ok". Set FOODMANAGER_SKIP_DB_TESTS=1 to
+// skip database tests deliberately.
 package testdb
 
 import (
@@ -32,12 +35,12 @@ func New(t testing.TB) *pgxpool.Pool {
 	if url == "" {
 		url = defaultURL
 	}
+	if os.Getenv("FOODMANAGER_SKIP_DB_TESTS") == "1" {
+		t.Skip("database tests skipped (FOODMANAGER_SKIP_DB_TESTS=1)")
+	}
 	admin, err := pgx.Connect(ctx, url)
 	if err != nil {
-		if os.Getenv("CI") != "" {
-			t.Fatalf("connect to test postgres: %v", err)
-		}
-		t.Skipf("postgres unavailable (run `make db-up`): %v", err)
+		t.Fatalf("postgres for tests is unavailable — start it with `make db-up`: %v", err)
 	}
 
 	suffix := make([]byte, 6)

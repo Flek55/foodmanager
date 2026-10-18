@@ -21,6 +21,135 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Что включено на сервере (например, есть ли Telegram-бот) */
+        get: operations["getConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/telegram/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Начать вход через Telegram-бота
+         * @description Возвращает ссылку на бота. Пользователь открывает её, бот спрашивает
+         *     подтверждение, а страница тем временем опрашивает /auth/telegram/complete.
+         */
+        post: operations["startTelegramLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/telegram/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Узнать, подтвердили ли вход в боте (и войти) */
+        post: operations["completeTelegramLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/telegram/webapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Вход из Telegram Mini App по подписанным initData
+         * @description Если Telegram не привязан ни к одному аккаунту — 404 telegram_not_linked
+         *     (приложение предложит войти в существующий аккаунт и привязать),
+         *     либо, с `create: true`, создаётся новый аккаунт.
+         */
+        post: operations["telegramWebAppLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/telegram/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ссылка на бота для привязки Telegram к аккаунту */
+        post: operations["createTelegramLink"];
+        /** Отвязать Telegram */
+        delete: operations["unlinkTelegram"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/telegram/link/webapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Привязать Telegram из Mini App (после входа по паролю) */
+        post: operations["linkTelegramWebApp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/telegram/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Какие уведомления присылать в Telegram */
+        put: operations["updateTelegramSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/register": {
         parameters: {
             query?: never;
@@ -594,6 +723,53 @@ export interface components {
         Me: {
             user: components["schemas"]["User"];
             households: components["schemas"]["HouseholdSummary"][];
+            /** @description Привязанный Telegram; отсутствует, если не привязан */
+            telegram?: components["schemas"]["TelegramAccount"];
+        };
+        AppConfig: {
+            /** @description Username бота без @; отсутствует, если Telegram не настроен */
+            telegramBot?: string;
+        };
+        TelegramAccount: {
+            username?: string;
+            firstName?: string;
+            /** @description Присылать, что другие добавили в список */
+            notifyAdded: boolean;
+            /** @description Присылать, что дома заканчивается */
+            notifyStock: boolean;
+        };
+        TelegramSettings: {
+            notifyAdded: boolean;
+            notifyStock: boolean;
+        };
+        TelegramLink: {
+            /** @example https://t.me/my_food_bot?start=link_abc */
+            url: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        TelegramLoginStart: {
+            /** @description Секрет этой попытки входа — передаётся в /auth/telegram/complete */
+            token: string;
+            url: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        TelegramLoginCompleteRequest: {
+            token: string;
+        };
+        TelegramLoginPending: {
+            /** @enum {string} */
+            status: "pending";
+        };
+        WebAppInitData: {
+            /** @description window.Telegram.WebApp.initData как есть */
+            initData: string;
+        };
+        WebAppLoginRequest: {
+            initData: string;
+            /** @description Создать новый аккаунт, если этот Telegram ещё не привязан */
+            create?: boolean;
         };
         HouseholdInput: {
             name: string;
@@ -867,6 +1043,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Больше не действует (истекло или отменено) */
+        Gone: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Слишком много попыток */
         TooManyRequests: {
             headers: {
@@ -920,6 +1105,206 @@ export interface operations {
                     "application/json": components["schemas"]["Health"];
                 };
             };
+        };
+    };
+    getConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppConfig"];
+                };
+            };
+        };
+    };
+    startTelegramLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramLoginStart"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    completeTelegramLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramLoginCompleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Вход подтверждён, сессия открыта */
+            200: {
+                headers: {
+                    "Set-Cookie": components["headers"]["SetSessionCookie"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description Ещё ждём подтверждения в Telegram */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramLoginPending"];
+                };
+            };
+            410: components["responses"]["Gone"];
+        };
+    };
+    telegramWebAppLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebAppLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Set-Cookie": components["headers"]["SetSessionCookie"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    createTelegramLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramLink"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unlinkTelegram: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Отвязан */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    linkTelegramWebApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebAppInitData"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramAccount"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    updateTelegramSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramSettings"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramAccount"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     register: {

@@ -87,10 +87,12 @@ func rateLimitByIP(rl *rateLimits) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var l *limiter
+			// Not limited on purpose: /api/auth/telegram/complete is polled every
+			// couple of seconds and only answers to an unguessable token.
 			switch p := r.URL.Path; {
-			case r.Method == http.MethodPost && p == "/api/auth/login":
+			case r.Method == http.MethodPost && (p == "/api/auth/login" || p == "/api/auth/telegram/webapp"):
 				l = rl.loginPerIP
-			case r.Method == http.MethodPost && p == "/api/auth/register":
+			case r.Method == http.MethodPost && (p == "/api/auth/register" || p == "/api/auth/telegram/start"):
 				l = rl.register
 			case strings.HasPrefix(p, "/api/invites/"):
 				l = rl.invites

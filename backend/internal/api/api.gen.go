@@ -117,6 +117,21 @@ func (e StockStatus) Valid() bool {
 	}
 }
 
+// Defines values for TelegramLoginPendingStatus.
+const (
+	Pending TelegramLoginPendingStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the TelegramLoginPendingStatus enum.
+func (e TelegramLoginPendingStatus) Valid() bool {
+	switch e {
+	case Pending:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Unit.
 const (
 	G    Unit = "g"
@@ -161,6 +176,12 @@ type AddItemRequest struct {
 
 	// Unit Единица количества: штуки, килограммы, граммы, литры, миллилитры, упаковки
 	Unit *Unit `json:"unit,omitempty"`
+}
+
+// AppConfig defines model for AppConfig.
+type AppConfig struct {
+	// TelegramBot Username бота без @; отсутствует, если Telegram не настроен
+	TelegramBot *string `json:"telegramBot,omitempty"`
 }
 
 // Category defines model for Category.
@@ -303,6 +324,7 @@ type LoginRequest struct {
 // Me defines model for Me.
 type Me struct {
 	Households []HouseholdSummary `json:"households"`
+	Telegram   *TelegramAccount   `json:"telegram,omitempty"`
 	User       User               `json:"user"`
 }
 
@@ -414,6 +436,54 @@ type SyncResponse struct {
 	Version  int64      `json:"version"`
 }
 
+// TelegramAccount defines model for TelegramAccount.
+type TelegramAccount struct {
+	FirstName *string `json:"firstName,omitempty"`
+
+	// NotifyAdded Присылать, что другие добавили в список
+	NotifyAdded bool `json:"notifyAdded"`
+
+	// NotifyStock Присылать, что дома заканчивается
+	NotifyStock bool    `json:"notifyStock"`
+	Username    *string `json:"username,omitempty"`
+}
+
+// TelegramLink defines model for TelegramLink.
+type TelegramLink struct {
+	ExpiresAt time.Time `json:"expiresAt"`
+
+	// Url Example: https://t.me/my_food_bot?start=link_abc
+	Url string `json:"url"`
+}
+
+// TelegramLoginCompleteRequest defines model for TelegramLoginCompleteRequest.
+type TelegramLoginCompleteRequest struct {
+	Token string `json:"token"`
+}
+
+// TelegramLoginPending defines model for TelegramLoginPending.
+type TelegramLoginPending struct {
+	Status TelegramLoginPendingStatus `json:"status"`
+}
+
+// TelegramLoginPendingStatus defines model for TelegramLoginPending.Status.
+type TelegramLoginPendingStatus string
+
+// TelegramLoginStart defines model for TelegramLoginStart.
+type TelegramLoginStart struct {
+	ExpiresAt time.Time `json:"expiresAt"`
+
+	// Token Секрет этой попытки входа — передаётся в /auth/telegram/complete
+	Token string `json:"token"`
+	Url   string `json:"url"`
+}
+
+// TelegramSettings defines model for TelegramSettings.
+type TelegramSettings struct {
+	NotifyAdded bool `json:"notifyAdded"`
+	NotifyStock bool `json:"notifyStock"`
+}
+
 // Tombstones Id записей, удалённых после `since`
 type Tombstones struct {
 	Categories []openapi_types.UUID `json:"categories"`
@@ -458,6 +528,19 @@ type User struct {
 	Id          openapi_types.UUID `json:"id"`
 }
 
+// WebAppInitData defines model for WebAppInitData.
+type WebAppInitData struct {
+	// InitData window.Telegram.WebApp.initData как есть
+	InitData string `json:"initData"`
+}
+
+// WebAppLoginRequest defines model for WebAppLoginRequest.
+type WebAppLoginRequest struct {
+	// Create Создать новый аккаунт, если этот Telegram ещё не привязан
+	Create   *bool  `json:"create,omitempty"`
+	InitData string `json:"initData"`
+}
+
 // HouseholdId defines model for HouseholdId.
 type HouseholdId = openapi_types.UUID
 
@@ -479,6 +562,9 @@ type Conflict = Error
 // Forbidden defines model for Forbidden.
 type Forbidden = Error
 
+// Gone defines model for Gone.
+type Gone = Error
+
 // NotFound defines model for NotFound.
 type NotFound = Error
 
@@ -498,6 +584,12 @@ type LoginJSONRequestBody = LoginRequest
 
 // RegisterJSONRequestBody defines body for Register for application/json ContentType.
 type RegisterJSONRequestBody = RegisterRequest
+
+// CompleteTelegramLoginJSONRequestBody defines body for CompleteTelegramLogin for application/json ContentType.
+type CompleteTelegramLoginJSONRequestBody = TelegramLoginCompleteRequest
+
+// TelegramWebAppLoginJSONRequestBody defines body for TelegramWebAppLogin for application/json ContentType.
+type TelegramWebAppLoginJSONRequestBody = WebAppLoginRequest
 
 // CreateHouseholdJSONRequestBody defines body for CreateHousehold for application/json ContentType.
 type CreateHouseholdJSONRequestBody = HouseholdInput
@@ -538,6 +630,12 @@ type CreateStoreJSONRequestBody = StoreInput
 // UpdateStoreJSONRequestBody defines body for UpdateStore for application/json ContentType.
 type UpdateStoreJSONRequestBody = StoreInput
 
+// LinkTelegramWebAppJSONRequestBody defines body for LinkTelegramWebApp for application/json ContentType.
+type LinkTelegramWebAppJSONRequestBody = WebAppInitData
+
+// UpdateTelegramSettingsJSONRequestBody defines body for UpdateTelegramSettings for application/json ContentType.
+type UpdateTelegramSettingsJSONRequestBody = TelegramSettings
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Login Вход по email и паролю
@@ -549,6 +647,18 @@ type ServerInterface interface {
 	// Register Регистрация по email и паролю
 	// (POST /auth/register)
 	Register(w http.ResponseWriter, r *http.Request)
+	// CompleteTelegramLogin Узнать, подтвердили ли вход в боте (и войти)
+	// (POST /auth/telegram/complete)
+	CompleteTelegramLogin(w http.ResponseWriter, r *http.Request)
+	// StartTelegramLogin Начать вход через Telegram-бота
+	// (POST /auth/telegram/start)
+	StartTelegramLogin(w http.ResponseWriter, r *http.Request)
+	// TelegramWebAppLogin Вход из Telegram Mini App по подписанным initData
+	// (POST /auth/telegram/webapp)
+	TelegramWebAppLogin(w http.ResponseWriter, r *http.Request)
+	// GetConfig Что включено на сервере (например, есть ли Telegram-бот)
+	// (GET /config)
+	GetConfig(w http.ResponseWriter, r *http.Request)
 	// GetHealth Проверка живости сервиса и базы данных
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -633,6 +743,18 @@ type ServerInterface interface {
 	// GetMe Текущий пользователь и его семьи
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// UnlinkTelegram Отвязать Telegram
+	// (DELETE /telegram/link)
+	UnlinkTelegram(w http.ResponseWriter, r *http.Request)
+	// CreateTelegramLink Ссылка на бота для привязки Telegram к аккаунту
+	// (POST /telegram/link)
+	CreateTelegramLink(w http.ResponseWriter, r *http.Request)
+	// LinkTelegramWebApp Привязать Telegram из Mini App (после входа по паролю)
+	// (POST /telegram/link/webapp)
+	LinkTelegramWebApp(w http.ResponseWriter, r *http.Request)
+	// UpdateTelegramSettings Какие уведомления присылать в Telegram
+	// (PUT /telegram/settings)
+	UpdateTelegramSettings(w http.ResponseWriter, r *http.Request)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -654,6 +776,30 @@ func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request) {
 // Register Регистрация по email и паролю
 // (POST /auth/register)
 func (_ Unimplemented) Register(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CompleteTelegramLogin Узнать, подтвердили ли вход в боте (и войти)
+// (POST /auth/telegram/complete)
+func (_ Unimplemented) CompleteTelegramLogin(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// StartTelegramLogin Начать вход через Telegram-бота
+// (POST /auth/telegram/start)
+func (_ Unimplemented) StartTelegramLogin(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// TelegramWebAppLogin Вход из Telegram Mini App по подписанным initData
+// (POST /auth/telegram/webapp)
+func (_ Unimplemented) TelegramWebAppLogin(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetConfig Что включено на сервере (например, есть ли Telegram-бот)
+// (GET /config)
+func (_ Unimplemented) GetConfig(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -825,6 +971,30 @@ func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// UnlinkTelegram Отвязать Telegram
+// (DELETE /telegram/link)
+func (_ Unimplemented) UnlinkTelegram(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateTelegramLink Ссылка на бота для привязки Telegram к аккаунту
+// (POST /telegram/link)
+func (_ Unimplemented) CreateTelegramLink(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// LinkTelegramWebApp Привязать Telegram из Mini App (после входа по паролю)
+// (POST /telegram/link/webapp)
+func (_ Unimplemented) LinkTelegramWebApp(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateTelegramSettings Какие уведомления присылать в Telegram
+// (PUT /telegram/settings)
+func (_ Unimplemented) UpdateTelegramSettings(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ServerInterfaceWrapper converts contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler            ServerInterface
@@ -867,6 +1037,62 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Register(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteTelegramLogin operation middleware
+func (siw *ServerInterfaceWrapper) CompleteTelegramLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteTelegramLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartTelegramLogin operation middleware
+func (siw *ServerInterfaceWrapper) StartTelegramLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartTelegramLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TelegramWebAppLogin operation middleware
+func (siw *ServerInterfaceWrapper) TelegramWebAppLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TelegramWebAppLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetConfig(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetConfig(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1683,6 +1909,62 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 	handler.ServeHTTP(w, r)
 }
 
+// UnlinkTelegram operation middleware
+func (siw *ServerInterfaceWrapper) UnlinkTelegram(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnlinkTelegram(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateTelegramLink operation middleware
+func (siw *ServerInterfaceWrapper) CreateTelegramLink(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateTelegramLink(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LinkTelegramWebApp operation middleware
+func (siw *ServerInterfaceWrapper) LinkTelegramWebApp(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LinkTelegramWebApp(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateTelegramSettings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTelegramSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateTelegramSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1800,6 +2082,30 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/health", wrapper.GetHealth)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/config", wrapper.GetConfig)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/telegram/start", wrapper.StartTelegramLogin)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/telegram/complete", wrapper.CompleteTelegramLogin)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/telegram/webapp", wrapper.TelegramWebAppLogin)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/telegram/link", wrapper.UnlinkTelegram)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/telegram/link", wrapper.CreateTelegramLink)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/telegram/link/webapp", wrapper.LinkTelegramWebApp)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/telegram/settings", wrapper.UpdateTelegramSettings)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/auth/register", wrapper.Register)
 	})
 	r.Group(func(r chi.Router) {
@@ -1898,6 +2204,8 @@ type BadRequestJSONResponse Error
 type ConflictJSONResponse Error
 
 type ForbiddenJSONResponse Error
+
+type GoneJSONResponse Error
 
 type NotFoundJSONResponse Error
 
@@ -2072,6 +2380,210 @@ func (response Register429JSONResponse) VisitRegisterResponse(w http.ResponseWri
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteTelegramLoginRequestObject struct {
+	Body *CompleteTelegramLoginJSONRequestBody
+}
+
+type CompleteTelegramLoginResponseObject interface {
+	VisitCompleteTelegramLoginResponse(w http.ResponseWriter) error
+}
+
+type CompleteTelegramLogin200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type CompleteTelegramLogin200JSONResponse struct {
+	Body    Me
+	Headers CompleteTelegramLogin200ResponseHeaders
+}
+
+func (response CompleteTelegramLogin200JSONResponse) VisitCompleteTelegramLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteTelegramLogin202JSONResponse TelegramLoginPending
+
+func (response CompleteTelegramLogin202JSONResponse) VisitCompleteTelegramLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteTelegramLogin410JSONResponse struct{ GoneJSONResponse }
+
+func (response CompleteTelegramLogin410JSONResponse) VisitCompleteTelegramLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTelegramLoginRequestObject struct {
+}
+
+type StartTelegramLoginResponseObject interface {
+	VisitStartTelegramLoginResponse(w http.ResponseWriter) error
+}
+
+type StartTelegramLogin200JSONResponse TelegramLoginStart
+
+func (response StartTelegramLogin200JSONResponse) VisitStartTelegramLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTelegramLogin404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response StartTelegramLogin404JSONResponse) VisitStartTelegramLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTelegramLogin429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response StartTelegramLogin429JSONResponse) VisitStartTelegramLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TelegramWebAppLoginRequestObject struct {
+	Body *TelegramWebAppLoginJSONRequestBody
+}
+
+type TelegramWebAppLoginResponseObject interface {
+	VisitTelegramWebAppLoginResponse(w http.ResponseWriter) error
+}
+
+type TelegramWebAppLogin200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type TelegramWebAppLogin200JSONResponse struct {
+	Body    Me
+	Headers TelegramWebAppLogin200ResponseHeaders
+}
+
+func (response TelegramWebAppLogin200JSONResponse) VisitTelegramWebAppLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TelegramWebAppLogin401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response TelegramWebAppLogin401JSONResponse) VisitTelegramWebAppLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TelegramWebAppLogin404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response TelegramWebAppLogin404JSONResponse) VisitTelegramWebAppLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TelegramWebAppLogin429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response TelegramWebAppLogin429JSONResponse) VisitTelegramWebAppLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConfigRequestObject struct {
+}
+
+type GetConfigResponseObject interface {
+	VisitGetConfigResponse(w http.ResponseWriter) error
+}
+
+type GetConfig200JSONResponse AppConfig
+
+func (response GetConfig200JSONResponse) VisitGetConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -3748,6 +4260,212 @@ func (response GetMe401JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	return err
 }
 
+type UnlinkTelegramRequestObject struct {
+}
+
+type UnlinkTelegramResponseObject interface {
+	VisitUnlinkTelegramResponse(w http.ResponseWriter) error
+}
+
+type UnlinkTelegram204Response struct {
+}
+
+func (response UnlinkTelegram204Response) VisitUnlinkTelegramResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type UnlinkTelegram401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UnlinkTelegram401JSONResponse) VisitUnlinkTelegramResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkTelegram404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UnlinkTelegram404JSONResponse) VisitUnlinkTelegramResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTelegramLinkRequestObject struct {
+}
+
+type CreateTelegramLinkResponseObject interface {
+	VisitCreateTelegramLinkResponse(w http.ResponseWriter) error
+}
+
+type CreateTelegramLink200JSONResponse TelegramLink
+
+func (response CreateTelegramLink200JSONResponse) VisitCreateTelegramLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTelegramLink401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response CreateTelegramLink401JSONResponse) VisitCreateTelegramLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTelegramLink404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateTelegramLink404JSONResponse) VisitCreateTelegramLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkTelegramWebAppRequestObject struct {
+	Body *LinkTelegramWebAppJSONRequestBody
+}
+
+type LinkTelegramWebAppResponseObject interface {
+	VisitLinkTelegramWebAppResponse(w http.ResponseWriter) error
+}
+
+type LinkTelegramWebApp200JSONResponse TelegramAccount
+
+func (response LinkTelegramWebApp200JSONResponse) VisitLinkTelegramWebAppResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkTelegramWebApp401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response LinkTelegramWebApp401JSONResponse) VisitLinkTelegramWebAppResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkTelegramWebApp404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response LinkTelegramWebApp404JSONResponse) VisitLinkTelegramWebAppResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkTelegramWebApp409JSONResponse struct{ ConflictJSONResponse }
+
+func (response LinkTelegramWebApp409JSONResponse) VisitLinkTelegramWebAppResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTelegramSettingsRequestObject struct {
+	Body *UpdateTelegramSettingsJSONRequestBody
+}
+
+type UpdateTelegramSettingsResponseObject interface {
+	VisitUpdateTelegramSettingsResponse(w http.ResponseWriter) error
+}
+
+type UpdateTelegramSettings200JSONResponse TelegramAccount
+
+func (response UpdateTelegramSettings200JSONResponse) VisitUpdateTelegramSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTelegramSettings401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateTelegramSettings401JSONResponse) VisitUpdateTelegramSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTelegramSettings404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateTelegramSettings404JSONResponse) VisitUpdateTelegramSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Login Вход по email и паролю
@@ -3759,6 +4477,18 @@ type StrictServerInterface interface {
 	// Register Регистрация по email и паролю
 	// (POST /auth/register)
 	Register(ctx context.Context, request RegisterRequestObject) (RegisterResponseObject, error)
+	// CompleteTelegramLogin Узнать, подтвердили ли вход в боте (и войти)
+	// (POST /auth/telegram/complete)
+	CompleteTelegramLogin(ctx context.Context, request CompleteTelegramLoginRequestObject) (CompleteTelegramLoginResponseObject, error)
+	// StartTelegramLogin Начать вход через Telegram-бота
+	// (POST /auth/telegram/start)
+	StartTelegramLogin(ctx context.Context, request StartTelegramLoginRequestObject) (StartTelegramLoginResponseObject, error)
+	// TelegramWebAppLogin Вход из Telegram Mini App по подписанным initData
+	// (POST /auth/telegram/webapp)
+	TelegramWebAppLogin(ctx context.Context, request TelegramWebAppLoginRequestObject) (TelegramWebAppLoginResponseObject, error)
+	// GetConfig Что включено на сервере (например, есть ли Telegram-бот)
+	// (GET /config)
+	GetConfig(ctx context.Context, request GetConfigRequestObject) (GetConfigResponseObject, error)
 	// GetHealth Проверка живости сервиса и базы данных
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -3843,6 +4573,18 @@ type StrictServerInterface interface {
 	// GetMe Текущий пользователь и его семьи
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// UnlinkTelegram Отвязать Telegram
+	// (DELETE /telegram/link)
+	UnlinkTelegram(ctx context.Context, request UnlinkTelegramRequestObject) (UnlinkTelegramResponseObject, error)
+	// CreateTelegramLink Ссылка на бота для привязки Telegram к аккаунту
+	// (POST /telegram/link)
+	CreateTelegramLink(ctx context.Context, request CreateTelegramLinkRequestObject) (CreateTelegramLinkResponseObject, error)
+	// LinkTelegramWebApp Привязать Telegram из Mini App (после входа по паролю)
+	// (POST /telegram/link/webapp)
+	LinkTelegramWebApp(ctx context.Context, request LinkTelegramWebAppRequestObject) (LinkTelegramWebAppResponseObject, error)
+	// UpdateTelegramSettings Какие уведомления присылать в Telegram
+	// (PUT /telegram/settings)
+	UpdateTelegramSettings(ctx context.Context, request UpdateTelegramSettingsRequestObject) (UpdateTelegramSettingsResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -3963,6 +4705,116 @@ func (sh *strictHandler) Register(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RegisterResponseObject); ok {
 		if err := validResponse.VisitRegisterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompleteTelegramLogin operation middleware
+func (sh *strictHandler) CompleteTelegramLogin(w http.ResponseWriter, r *http.Request) {
+	var request CompleteTelegramLoginRequestObject
+
+	var body CompleteTelegramLoginJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteTelegramLogin(ctx, request.(CompleteTelegramLoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteTelegramLogin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteTelegramLoginResponseObject); ok {
+		if err := validResponse.VisitCompleteTelegramLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartTelegramLogin operation middleware
+func (sh *strictHandler) StartTelegramLogin(w http.ResponseWriter, r *http.Request) {
+	var request StartTelegramLoginRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartTelegramLogin(ctx, request.(StartTelegramLoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartTelegramLogin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartTelegramLoginResponseObject); ok {
+		if err := validResponse.VisitStartTelegramLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TelegramWebAppLogin operation middleware
+func (sh *strictHandler) TelegramWebAppLogin(w http.ResponseWriter, r *http.Request) {
+	var request TelegramWebAppLoginRequestObject
+
+	var body TelegramWebAppLoginJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TelegramWebAppLogin(ctx, request.(TelegramWebAppLoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TelegramWebAppLogin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TelegramWebAppLoginResponseObject); ok {
+		if err := validResponse.VisitTelegramWebAppLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetConfig operation middleware
+func (sh *strictHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
+	var request GetConfigRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetConfig(ctx, request.(GetConfigRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetConfig")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetConfigResponseObject); ok {
+		if err := validResponse.VisitGetConfigResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -4791,6 +5643,116 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnlinkTelegram operation middleware
+func (sh *strictHandler) UnlinkTelegram(w http.ResponseWriter, r *http.Request) {
+	var request UnlinkTelegramRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnlinkTelegram(ctx, request.(UnlinkTelegramRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnlinkTelegram")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnlinkTelegramResponseObject); ok {
+		if err := validResponse.VisitUnlinkTelegramResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateTelegramLink operation middleware
+func (sh *strictHandler) CreateTelegramLink(w http.ResponseWriter, r *http.Request) {
+	var request CreateTelegramLinkRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateTelegramLink(ctx, request.(CreateTelegramLinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateTelegramLink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateTelegramLinkResponseObject); ok {
+		if err := validResponse.VisitCreateTelegramLinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// LinkTelegramWebApp operation middleware
+func (sh *strictHandler) LinkTelegramWebApp(w http.ResponseWriter, r *http.Request) {
+	var request LinkTelegramWebAppRequestObject
+
+	var body LinkTelegramWebAppJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.LinkTelegramWebApp(ctx, request.(LinkTelegramWebAppRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "LinkTelegramWebApp")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LinkTelegramWebAppResponseObject); ok {
+		if err := validResponse.VisitLinkTelegramWebAppResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateTelegramSettings operation middleware
+func (sh *strictHandler) UpdateTelegramSettings(w http.ResponseWriter, r *http.Request) {
+	var request UpdateTelegramSettingsRequestObject
+
+	var body UpdateTelegramSettingsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateTelegramSettings(ctx, request.(UpdateTelegramSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateTelegramSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateTelegramSettingsResponseObject); ok {
+		if err := validResponse.VisitUpdateTelegramSettingsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

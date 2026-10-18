@@ -26,14 +26,15 @@ var (
 )
 
 type Service struct {
-	pool *pgxpool.Pool
-	q    *store.Queries
-	pub  events.Publisher
-	now  func() time.Time
+	pool   *pgxpool.Pool
+	q      *store.Queries
+	pub    events.Publisher
+	notify Notifier
+	now    func() time.Time
 }
 
 func NewService(pool *pgxpool.Pool, pub events.Publisher) *Service {
-	return &Service{pool: pool, q: store.New(pool), pub: pub, now: time.Now}
+	return &Service{pool: pool, q: store.New(pool), pub: pub, notify: nopNotifier{}, now: time.Now}
 }
 
 // Snapshot is everything the list screen needs, read consistently as of
@@ -190,6 +191,7 @@ func (s *Service) AddItem(ctx context.Context, userID, householdID uuid.UUID, in
 	}
 
 	var itemID uuid.UUID
+	inserted := false // a really new item, not a retry or a merge
 	err = s.write(ctx, userID, householdID, func(q *store.Queries, version int64) error {
 		// A retried request (e.g. after a flaky connection) must not
 		// create a second item.
@@ -224,7 +226,7 @@ func (s *Service) AddItem(ctx context.Context, userID, householdID uuid.UUID, in
 			return err
 		}
 
-		itemID, created = newID, true
+		itemID, created, inserted = newID, true, true
 		if err := q.CreateItem(ctx, store.CreateItemParams{
 			ID: newID, HouseholdID: householdID, ProductID: product.ID,
 			Quantity: qty, Unit: unit, Note: note, StoreID: in.StoreID,
@@ -240,6 +242,9 @@ func (s *Service) AddItem(ctx context.Context, userID, householdID uuid.UUID, in
 		return item, false, err
 	}
 	item, err = s.itemView(ctx, householdID, itemID)
+	if err == nil && inserted {
+		s.notify.ItemAdded(householdID, userID, ItemLabel(item.Name, item.Quantity, item.Unit))
+	}
 	return item, created, err
 }
 

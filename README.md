@@ -41,7 +41,11 @@ make web                    # фронт на http://127.0.0.1:5173
 комментарием `-- name: Имя :one|:many|:exec|:execrows` и выполнить `make gen`.
 
 Тесты бэкенда работают на настоящем Postgres: каждый тест создаёт себе
-временную базу и удаляет её в конце. Перед `make test` нужно запустить `make db-up`.
+временную базу и удаляет её в конце. Перед `make test` нужно запустить `make db-up`,
+иначе тесты упадут с подсказкой.
+
+Telegram-бот в разработке (нужен отдельный тестовый бот от @BotFather):
+`$env:TELEGRAM_BOT_TOKEN="…"; make run`. Без токена всё работает, просто без бота.
 
 ## Структура
 
@@ -56,6 +60,8 @@ backend/
   internal/household/     семьи, участники, инвайт-коды
   internal/shopping/      список, товары, категории (+ угадывание), магазины
   internal/events/        хаб событий для SSE
+  internal/telegram/      минимальный клиент Telegram Bot API, проверка initData Mini App, фейковый сервер для тестов
+  internal/tgbot/         бот: привязка, вход, добавление сообщением, /list, уведомления-дайджесты
   internal/httpapi/       роутер, middleware, хендлеры
   internal/config/        настройки из env
   internal/db/            пул соединений, миграции

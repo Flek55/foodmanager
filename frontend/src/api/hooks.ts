@@ -69,6 +69,53 @@ export function useLogout() {
   });
 }
 
+/** Server features: e.g. whether a Telegram bot is configured. */
+export function useConfig() {
+  return useQuery({
+    queryKey: ["config"],
+    queryFn: () => unwrap(api.GET("/config")),
+    staleTime: Infinity,
+  });
+}
+
+// ---- Telegram ----
+
+export function useTelegramWebAppLogin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Schemas["WebAppLoginRequest"]) => unwrap(api.POST("/auth/telegram/webapp", { body })),
+    onSuccess: (me) => qc.setQueryData(keys.me, me),
+  });
+}
+
+export function useLinkTelegramWebApp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (initData: string) => unwrap(api.POST("/telegram/link/webapp", { body: { initData } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
+export function useCreateTelegramLink() {
+  return useMutation({ mutationFn: () => unwrap(api.POST("/telegram/link")) });
+}
+
+export function useUnlinkTelegram() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => unwrap(api.DELETE("/telegram/link")),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
+export function useTelegramSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Schemas["TelegramSettings"]) => unwrap(api.PUT("/telegram/settings", { body })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
 // ---- Households ----
 
 export function useHousehold(id: string | undefined) {

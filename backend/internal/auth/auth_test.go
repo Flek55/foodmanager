@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"foodmanager/internal/apperr"
-	"foodmanager/internal/store"
 	"foodmanager/internal/testdb"
 )
 
@@ -55,7 +54,7 @@ func TestNormalizeEmail(t *testing.T) {
 
 func TestRegisterLoginLogout(t *testing.T) {
 	ctx := context.Background()
-	svc := NewService(store.New(testdb.New(t)))
+	svc := NewService(testdb.New(t))
 
 	user, sess, err := svc.Register(ctx, "Masha@Example.com", "password123", "  Маша  ", "test-agent")
 	if err != nil {
@@ -94,7 +93,7 @@ func TestRegisterLoginLogout(t *testing.T) {
 }
 
 func TestRegisterValidation(t *testing.T) {
-	svc := NewService(store.New(testdb.New(t)))
+	svc := NewService(testdb.New(t))
 	ctx := context.Background()
 
 	_, _, err := svc.Register(ctx, "a@b.ru", "short", "Маша", "")
@@ -107,7 +106,7 @@ func TestRegisterValidation(t *testing.T) {
 
 func TestSessionSlidingRefresh(t *testing.T) {
 	ctx := context.Background()
-	svc := NewService(store.New(testdb.New(t)))
+	svc := NewService(testdb.New(t))
 	_, sess, err := svc.Register(ctx, "a@b.ru", "password123", "Маша", "")
 	if err != nil {
 		t.Fatal(err)

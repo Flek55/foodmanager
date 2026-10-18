@@ -26,6 +26,7 @@ type Handler struct {
 	hub        *events.Hub
 	cookies    cookieConfig
 	limits     *rateLimits
+	telegram   *TelegramConfig
 	version    string
 }
 
@@ -38,6 +39,7 @@ type Deps struct {
 	Shopping     *shopping.Service
 	Hub          *events.Hub
 	SecureCookie bool
+	Telegram     *TelegramConfig // nil when no bot is configured
 	Version      string
 }
 
@@ -50,6 +52,7 @@ func NewHandler(d Deps) *Handler {
 		hub:        d.Hub,
 		cookies:    cookieConfig{secure: d.SecureCookie},
 		limits:     newRateLimits(),
+		telegram:   d.Telegram,
 		version:    d.Version,
 	}
 }

@@ -1,5 +1,5 @@
-// Command server runs the Foodmanager backend: HTTP API, and later the
-// Telegram bot and background jobs, all in one process.
+// Command server runs the Foodmanager backend: HTTP API, the Telegram bot
+// and background jobs, all in one process.
 package main
 
 import (
@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"foodmanager/internal/auth"
 	"foodmanager/internal/config"
 	"foodmanager/internal/db"
@@ -21,6 +23,8 @@ import (
 	"foodmanager/internal/httpapi"
 	"foodmanager/internal/shopping"
 	"foodmanager/internal/store"
+	"foodmanager/internal/telegram"
+	"foodmanager/internal/tgbot"
 )
 
 // version is set at build time: go build -ldflags "-X main.version=1.2.3".
@@ -81,15 +85,23 @@ func run() error {
 	}
 
 	hub := events.NewHub()
-	authSvc := auth.NewService(store.New(pool))
+	authSvc := auth.NewService(pool)
 	shoppingSvc := shopping.NewService(pool, hub)
+	householdSvc := household.NewService(pool, hub)
+
+	tgConfig, notifier := startTelegram(ctx, cfg, log, pool, authSvc, shoppingSvc, householdSvc)
+	if notifier != nil {
+		defer notifier.FlushAll() // don't lose a pending digest on restart
+	}
+
 	handler := httpapi.NewHandler(httpapi.Deps{
 		DB:           pool,
 		Auth:         authSvc,
-		Households:   household.NewService(pool, hub),
+		Households:   householdSvc,
 		Shopping:     shoppingSvc,
 		Hub:          hub,
 		SecureCookie: cfg.IsProd(),
+		Telegram:     tgConfig,
 		Version:      version,
 	})
 	go purgeSessionsLoop(ctx, authSvc, log)
@@ -125,6 +137,34 @@ func run() error {
 	return srv.Shutdown(shutdownCtx)
 }
 
+// startTelegram starts the bot if a token is configured. The app works
+// fine without it: if Telegram is unreachable at startup (e.g. blocked from
+// this network), we log and carry on with Telegram features off.
+func startTelegram(ctx context.Context, cfg config.Config, log *slog.Logger, pool *pgxpool.Pool,
+	authSvc *auth.Service, shoppingSvc *shopping.Service, householdSvc *household.Service,
+) (*httpapi.TelegramConfig, *tgbot.Notifier) {
+	if cfg.TelegramBotToken == "" {
+		log.Info("telegram disabled: TELEGRAM_BOT_TOKEN not set")
+		return nil, nil
+	}
+	api := telegram.New(cfg.TelegramBotToken, cfg.TelegramAPIURL)
+	q := store.New(pool)
+	bot := tgbot.New(api, authSvc, shoppingSvc, householdSvc, q, log, cfg.PublicURL)
+
+	setupCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	if err := bot.Setup(setupCtx); err != nil {
+		log.Error("telegram disabled: bot setup failed", "err", err)
+		return nil, nil
+	}
+
+	notifier := tgbot.NewNotifier(api, q, log, cfg.PublicURL, tgbot.DefaultDigestDelay)
+	shoppingSvc.SetNotifier(notifier)
+	go bot.Run(ctx)
+	log.Info("telegram bot started", "bot", bot.Username(), "mini_app", cfg.PublicURL)
+	return &httpapi.TelegramConfig{BotToken: cfg.TelegramBotToken, BotUsername: bot.Username()}, notifier
+}
+
 func purgeSessionsLoop(ctx context.Context, svc *auth.Service, log *slog.Logger) {
 	t := time.NewTicker(time.Hour)
 	defer t.Stop()
@@ -138,6 +178,9 @@ func purgeSessionsLoop(ctx context.Context, svc *auth.Service, log *slog.Logger)
 				log.Error("purge expired sessions", "err", err)
 			} else if n > 0 {
 				log.Info("purged expired sessions", "count", n)
+			}
+			if _, err := svc.PurgeExpiredTelegramTokens(ctx); err != nil {
+				log.Error("purge telegram tokens", "err", err)
 			}
 		}
 	}

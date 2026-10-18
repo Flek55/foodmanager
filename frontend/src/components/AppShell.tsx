@@ -5,7 +5,6 @@ import type { Schemas } from "../api/client";
 import { useCurrentHousehold } from "../lib/currentHousehold";
 import { useHouseholdEvents } from "../lib/events";
 import { pluralize } from "../lib/format";
-import { Toaster } from "../lib/toast";
 import type { SyncStatus } from "../sync/engine";
 import { useListSync } from "../sync/useListSync";
 
@@ -57,7 +56,6 @@ function Shell({
           <Tab to="/profile" icon={<User className="size-6" />} label="Профиль" />
         </div>
       </nav>
-      <Toaster />
     </div>
   );
 }

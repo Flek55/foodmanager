@@ -7,6 +7,7 @@ import { keys } from "./api/hooks";
 import { App } from "./App";
 import { captureInstallPrompt } from "./lib/install";
 import { persistQueries, restoreQueries } from "./lib/persist";
+import { initMiniApp } from "./lib/telegram";
 import { toast } from "./lib/toast";
 import { configureSync } from "./sync/engine";
 import "./index.css";
@@ -37,6 +38,7 @@ configureSync({
 });
 
 captureInstallPrompt();
+initMiniApp();
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {

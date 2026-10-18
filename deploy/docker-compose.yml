@@ -49,6 +49,10 @@ services:
       DATABASE_URL: postgres://foodmanager:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/foodmanager?sslmode=disable
       # Caddy sets X-Real-IP; the app is not reachable except through it.
       TRUST_PROXY: "true"
+      # Used on Telegram buttons and registered as the bot's Mini App.
+      PUBLIC_URL: https://${DOMAIN}
+      # Empty = no bot; the app works without it.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     logging: *logging
 
   postgres:

@@ -44,20 +44,31 @@ func (s *Service) SetStock(ctx context.Context, userID, householdID, productID u
 		return StockResult{}, err
 	}
 	var addedItem *uuid.UUID
+	var before store.Product
 	err := s.write(ctx, userID, householdID, func(q *store.Queries, version int64) error {
-		if _, err := q.GetProduct(ctx, store.GetProductParams{HouseholdID: householdID, ID: productID}); errors.Is(err, pgx.ErrNoRows) {
+		var err error
+		before, err = q.GetProduct(ctx, store.GetProductParams{HouseholdID: householdID, ID: productID})
+		if errors.Is(err, pgx.ErrNoRows) {
 			return errProductNotFound
 		} else if err != nil {
 			return err
 		}
-		var err error
 		addedItem, err = applyStock(ctx, q, householdID, productID, userID, status, itemID, version)
 		return err
 	})
 	if err != nil {
 		return StockResult{}, err
 	}
+	s.notifyStock(householdID, userID, before.Name, before.StockStatus, status)
 	return s.stockResult(ctx, householdID, productID, addedItem)
+}
+
+// notifyStock tells the family when something starts running out — only on
+// the change, so pressing "Нет" twice doesn't send two messages.
+func (s *Service) notifyStock(householdID, userID uuid.UUID, name string, before *string, after string) {
+	if (after == StockLow || after == StockOut) && (before == nil || *before != after) {
+		s.notify.StockChanged(householdID, userID, name, after)
+	}
 }
 
 // TrackProduct starts tracking a product at home by name, creating the
@@ -77,6 +88,7 @@ func (s *Service) TrackProduct(ctx context.Context, userID, householdID uuid.UUI
 
 	var id uuid.UUID
 	var addedItem *uuid.UUID
+	var before store.Product
 	err = s.write(ctx, userID, householdID, func(q *store.Queries, version int64) error {
 		product, err := q.GetProductByName(ctx, store.GetProductByNameParams{HouseholdID: householdID, Name: name})
 		switch {
@@ -104,13 +116,14 @@ func (s *Service) TrackProduct(ctx context.Context, userID, householdID uuid.UUI
 		case err != nil:
 			return err
 		}
-		id = product.ID
+		id, before = product.ID, product
 		addedItem, err = applyStock(ctx, q, householdID, product.ID, userID, status, itemID, version)
 		return err
 	})
 	if err != nil {
 		return StockResult{}, err
 	}
+	s.notifyStock(householdID, userID, before.Name, before.StockStatus, status)
 	return s.stockResult(ctx, householdID, id, addedItem)
 }
 

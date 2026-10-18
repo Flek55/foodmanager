@@ -16,7 +16,6 @@ import (
 	"foodmanager/internal/events"
 	"foodmanager/internal/household"
 	"foodmanager/internal/shopping"
-	"foodmanager/internal/store"
 	"foodmanager/internal/testdb"
 )
 
@@ -28,19 +27,28 @@ type client struct {
 }
 
 func newServer(t *testing.T) string {
+	base, _ := newServerWith(t, nil)
+	return base
+}
+
+// newServerWith also returns the auth service, for tests that need to play
+// the bot's part (approving a Telegram login).
+func newServerWith(t *testing.T, tg *TelegramConfig) (string, *auth.Service) {
 	pool := testdb.New(t)
 	hub := events.NewHub()
+	authSvc := auth.NewService(pool)
 	h := NewHandler(Deps{
 		DB:         pool,
-		Auth:       auth.NewService(store.New(pool)),
+		Auth:       authSvc,
 		Households: household.NewService(pool, hub),
 		Shopping:   shopping.NewService(pool, hub),
 		Hub:        hub,
+		Telegram:   tg,
 		Version:    "test",
 	})
 	srv := httptest.NewServer(NewRouter(h, slog.New(slog.DiscardHandler), RouterOptions{}))
 	t.Cleanup(srv.Close)
-	return srv.URL
+	return srv.URL, authSvc
 }
 
 func newClient(t *testing.T, base string) *client {

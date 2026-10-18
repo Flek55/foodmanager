@@ -27,6 +27,7 @@ tags:
   - name: list
   - name: stock
   - name: catalog
+  - name: telegram
 paths:
   /health:
     get:
@@ -47,6 +48,181 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+
+  /config:
+    get:
+      operationId: getConfig
+      summary: Что включено на сервере (например, есть ли Telegram-бот)
+      tags: [system]
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppConfig"
+
+  /auth/telegram/start:
+    post:
+      operationId: startTelegramLogin
+      summary: Начать вход через Telegram-бота
+      description: |
+        Возвращает ссылку на бота. Пользователь открывает её, бот спрашивает
+        подтверждение, а страница тем временем опрашивает /auth/telegram/complete.
+      tags: [auth]
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramLoginStart"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/telegram/complete:
+    post:
+      operationId: completeTelegramLogin
+      summary: Узнать, подтвердили ли вход в боте (и войти)
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramLoginCompleteRequest"
+      responses:
+        "200":
+          description: Вход подтверждён, сессия открыта
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetSessionCookie"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "202":
+          description: Ещё ждём подтверждения в Telegram
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramLoginPending"
+        "410":
+          $ref: "#/components/responses/Gone"
+
+  /auth/telegram/webapp:
+    post:
+      operationId: telegramWebAppLogin
+      summary: Вход из Telegram Mini App по подписанным initData
+      description: |
+        Если Telegram не привязан ни к одному аккаунту — 404 telegram_not_linked
+        (приложение предложит войти в существующий аккаунт и привязать),
+        либо, с `create: true`, создаётся новый аккаунт.
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebAppLoginRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetSessionCookie"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /telegram/link:
+    post:
+      operationId: createTelegramLink
+      summary: Ссылка на бота для привязки Telegram к аккаунту
+      tags: [telegram]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramLink"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: unlinkTelegram
+      summary: Отвязать Telegram
+      tags: [telegram]
+      responses:
+        "204":
+          description: Отвязан
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /telegram/link/webapp:
+    post:
+      operationId: linkTelegramWebApp
+      summary: Привязать Telegram из Mini App (после входа по паролю)
+      tags: [telegram]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebAppInitData"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /telegram/settings:
+    put:
+      operationId: updateTelegramSettings
+      summary: Какие уведомления присылать в Telegram
+      tags: [telegram]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramSettings"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /auth/register:
     post:
@@ -856,6 +1032,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    Gone:
+      description: Больше не действует (истекло или отменено)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     TooManyRequests:
       description: Слишком много попыток
       content:
@@ -959,6 +1141,97 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/HouseholdSummary"
+        telegram:
+          $ref: "#/components/schemas/TelegramAccount"
+          description: Привязанный Telegram; отсутствует, если не привязан
+
+    AppConfig:
+      type: object
+      properties:
+        telegramBot:
+          type: string
+          description: Username бота без @; отсутствует, если Telegram не настроен
+
+    TelegramAccount:
+      type: object
+      required: [notifyAdded, notifyStock]
+      properties:
+        username:
+          type: string
+        firstName:
+          type: string
+        notifyAdded:
+          type: boolean
+          description: Присылать, что другие добавили в список
+        notifyStock:
+          type: boolean
+          description: Присылать, что дома заканчивается
+
+    TelegramSettings:
+      type: object
+      required: [notifyAdded, notifyStock]
+      properties:
+        notifyAdded:
+          type: boolean
+        notifyStock:
+          type: boolean
+
+    TelegramLink:
+      type: object
+      required: [url, expiresAt]
+      properties:
+        url:
+          type: string
+          example: https://t.me/my_food_bot?start=link_abc
+        expiresAt:
+          type: string
+          format: date-time
+
+    TelegramLoginStart:
+      type: object
+      required: [token, url, expiresAt]
+      properties:
+        token:
+          type: string
+          description: Секрет этой попытки входа — передаётся в /auth/telegram/complete
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+
+    TelegramLoginCompleteRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
+    TelegramLoginPending:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending]
+
+    WebAppInitData:
+      type: object
+      required: [initData]
+      properties:
+        initData:
+          type: string
+          description: window.Telegram.WebApp.initData как есть
+
+    WebAppLoginRequest:
+      type: object
+      required: [initData]
+      properties:
+        initData:
+          type: string
+        create:
+          type: boolean
+          description: Создать новый аккаунт, если этот Telegram ещё не привязан
 
     HouseholdInput:
       type: object

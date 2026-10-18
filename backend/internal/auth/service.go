@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"foodmanager/internal/apperr"
 	"foodmanager/internal/store"
@@ -26,12 +27,13 @@ const (
 )
 
 type Service struct {
-	q   *store.Queries
-	now func() time.Time
+	pool *pgxpool.Pool
+	q    *store.Queries
+	now  func() time.Time
 }
 
-func NewService(q *store.Queries) *Service {
-	return &Service{q: q, now: time.Now}
+func NewService(pool *pgxpool.Pool) *Service {
+	return &Service{pool: pool, q: store.New(pool), now: time.Now}
 }
 
 // Session is an opened session: the raw token goes into the cookie and is

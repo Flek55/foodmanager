@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -23,18 +24,28 @@ type Config struct {
 	// Enable ONLY behind a reverse proxy that sets these headers (Caddy in
 	// prod); otherwise any client could fake its IP to dodge rate limits.
 	TrustProxy bool
+	// PublicURL is the app's public address, e.g. https://ivanovy.duckdns.org.
+	// The bot puts it on buttons and registers it as the Mini App.
+	PublicURL string
+	// TelegramBotToken from @BotFather; empty disables everything Telegram.
+	TelegramBotToken string
+	// TelegramAPIURL overrides api.telegram.org (a proxy or self-hosted Bot API).
+	TelegramAPIURL string
 	// ShutdownTimeout bounds graceful shutdown.
 	ShutdownTimeout time.Duration
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		Env:             getenv("APP_ENV", "dev"),
-		HTTPAddr:        getenv("HTTP_ADDR", ":8080"),
-		DatabaseURL:     getenv("DATABASE_URL", "postgres://foodmanager:foodmanager@localhost:5433/foodmanager?sslmode=disable"),
-		StaticDir:       os.Getenv("STATIC_DIR"),
-		TrustProxy:      os.Getenv("TRUST_PROXY") == "true",
-		ShutdownTimeout: 10 * time.Second,
+		Env:              getenv("APP_ENV", "dev"),
+		HTTPAddr:         getenv("HTTP_ADDR", ":8080"),
+		DatabaseURL:      getenv("DATABASE_URL", "postgres://foodmanager:foodmanager@localhost:5433/foodmanager?sslmode=disable"),
+		StaticDir:        os.Getenv("STATIC_DIR"),
+		TrustProxy:       os.Getenv("TRUST_PROXY") == "true",
+		PublicURL:        strings.TrimRight(os.Getenv("PUBLIC_URL"), "/"),
+		TelegramBotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
+		TelegramAPIURL:   os.Getenv("TELEGRAM_API_URL"),
+		ShutdownTimeout:  10 * time.Second,
 	}
 	if cfg.Env != "dev" && cfg.Env != "prod" {
 		return Config{}, fmt.Errorf("APP_ENV must be dev or prod, got %q", cfg.Env)

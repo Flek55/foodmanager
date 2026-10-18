@@ -127,6 +127,32 @@ type Store struct {
 	DeletedAt   *time.Time
 }
 
+type TelegramAccount struct {
+	UserID             uuid.UUID
+	TelegramUserID     int64
+	ChatID             int64
+	Username           *string
+	FirstName          *string
+	DefaultHouseholdID *uuid.UUID
+	NotifyAdded        bool
+	NotifyStock        bool
+	BlockedAt          *time.Time
+	LinkedAt           time.Time
+}
+
+type TelegramToken struct {
+	TokenHash      []byte
+	Purpose        string
+	UserID         *uuid.UUID
+	TelegramUserID *int64
+	ApprovedAt     *time.Time
+	RejectedAt     *time.Time
+	UsedAt         *time.Time
+	UserAgent      *string
+	ExpiresAt      time.Time
+	CreatedAt      time.Time
+}
+
 type User struct {
 	ID              uuid.UUID
 	DisplayName     string

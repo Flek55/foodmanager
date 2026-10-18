@@ -78,7 +78,7 @@ func (h *Handler) me(ctx context.Context, user store.User) (api.Me, error) {
 	for i, r := range rows {
 		households[i] = api.HouseholdSummary{Id: r.ID, Name: r.Name, Role: api.Role(r.Role)}
 	}
-	return api.Me{
+	me := api.Me{
 		User: api.User{
 			Id:          user.ID,
 			DisplayName: user.DisplayName,
@@ -86,5 +86,14 @@ func (h *Handler) me(ctx context.Context, user store.User) (api.Me, error) {
 			AvatarUrl:   user.AvatarUrl,
 		},
 		Households: households,
-	}, nil
+	}
+	acc, err := h.auth.TelegramAccount(ctx, user.ID)
+	if err != nil {
+		return api.Me{}, err
+	}
+	if acc != nil {
+		tg := toTelegramAccount(*acc)
+		me.Telegram = &tg
+	}
+	return me, nil
 }
