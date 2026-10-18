@@ -8,13 +8,15 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc",
-    "gen:api": "openapi-typescript ../api/openapi.yaml -o src/api/schema.d.ts"
+    "gen:api": "openapi-typescript ../api/openapi.yaml -o src/api/schema.d.ts --default-non-nullable false"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.4",
+    "lucide-react": "^1.59.0",
     "openapi-fetch": "^0.17.0",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-router": "^8.4.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -23,7 +25,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4.3.3",
-    "typescript": "^6.0.3",
+    "typescript": "~5.9",
     "vite": "^8.3.4"
   }
 }

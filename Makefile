@@ -9,7 +9,7 @@ help:
 	@echo db-psql   - open psql shell in dev database
 	@echo run       - run Go backend on :8080 (applies migrations)
 	@echo web       - run Vite dev server on :5173
-	@echo gen       - regenerate Go and TS code from api/openapi.yaml
+	@echo gen       - regenerate code: sqlc queries, Go server and TS client from openapi.yaml
 	@echo build     - production build of frontend and backend
 	@echo test      - run all tests
 	@echo check     - vet + tests + typecheck, same as CI
@@ -32,7 +32,10 @@ run:
 web:
 	npm --prefix frontend run dev
 
+SQLC_IMAGE = sqlc/sqlc:1.30.0
+
 gen:
+	docker run --rm -v "$(CURDIR)/backend:/src" -w /src $(SQLC_IMAGE) generate
 	go -C backend generate ./...
 	npm --prefix frontend run gen:api
 

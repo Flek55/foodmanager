@@ -1,19 +1,30 @@
 openapi: 3.0.3
 info:
   title: Foodmanager API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     API семейного списка покупок и учёта запасов.
     Единственный источник правды для контракта: из этого файла генерируются
     Go-сервер (oapi-codegen) и TypeScript-клиент (openapi-typescript).
+
+    Аутентификация: httpOnly cookie `fm_session`, её ставят /auth/register и /auth/login.
+    Ошибки всегда приходят в формате `Error` с машиночитаемым `code`.
 servers:
   - url: /api
+security:
+  - sessionCookie: []
+tags:
+  - name: system
+  - name: auth
+  - name: households
+  - name: invites
 paths:
   /health:
     get:
       operationId: getHealth
       summary: Проверка живости сервиса и базы данных
       tags: [system]
+      security: []
       responses:
         "200":
           description: Сервис работает
@@ -27,7 +38,357 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+
+  /auth/register:
+    post:
+      operationId: register
+      summary: Регистрация по email и паролю
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Аккаунт создан, сессия открыта
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetSessionCookie"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/login:
+    post:
+      operationId: login
+      summary: Вход по email и паролю
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Сессия открыта
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetSessionCookie"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Выход (закрывает текущую сессию)
+      tags: [auth]
+      responses:
+        "204":
+          description: Сессия закрыта
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetSessionCookie"
+
+  /me:
+    get:
+      operationId: getMe
+      summary: Текущий пользователь и его семьи
+      tags: [auth]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /households:
+    post:
+      operationId: createHousehold
+      summary: Создать семью (создатель становится владельцем)
+      tags: [households]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HouseholdInput"
+      responses:
+        "201":
+          description: Семья создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HouseholdDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /households/{householdId}:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+    get:
+      operationId: getHousehold
+      summary: Семья и её участники
+      tags: [households]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HouseholdDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateHousehold
+      summary: Переименовать семью (только владелец)
+      tags: [households]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HouseholdInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HouseholdDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /households/{householdId}/members/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: removeMember
+      summary: Исключить участника (владелец) или выйти из семьи (сам себя)
+      description: |
+        Если выходит последний владелец, права владельца переходят к участнику,
+        который состоит в семье дольше всех. Если выходит последний человек,
+        семья удаляется вместе со всеми данными.
+      tags: [households]
+      responses:
+        "204":
+          description: Участник удалён
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /households/{householdId}/invites:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+    get:
+      operationId: listInvites
+      summary: Действующие инвайт-коды семьи
+      tags: [invites]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invite"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createInvite
+      summary: Создать инвайт-код (любой участник)
+      tags: [invites]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteInput"
+      responses:
+        "201":
+          description: Код создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invite"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /households/{householdId}/invites/{code}:
+    parameters:
+      - $ref: "#/components/parameters/HouseholdId"
+      - $ref: "#/components/parameters/InviteCode"
+    delete:
+      operationId: revokeInvite
+      summary: Отозвать инвайт-код
+      tags: [invites]
+      responses:
+        "204":
+          description: Код отозван
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /invites/{code}:
+    parameters:
+      - $ref: "#/components/parameters/InviteCode"
+    get:
+      operationId: previewInvite
+      summary: Куда приглашает код (можно без входа)
+      tags: [invites]
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitePreview"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /invites/{code}/accept:
+    parameters:
+      - $ref: "#/components/parameters/InviteCode"
+    post:
+      operationId: acceptInvite
+      summary: Вступить в семью по коду
+      tags: [invites]
+      responses:
+        "200":
+          description: Вы в семье (если уже были в ней, ничего не меняется)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HouseholdDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: fm_session
+
+  parameters:
+    HouseholdId:
+      name: householdId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    InviteCode:
+      name: code
+      in: path
+      required: true
+      description: Код без учёта регистра, дефис необязателен
+      schema:
+        type: string
+        example: K7QM-2XPA
+
+  headers:
+    SetSessionCookie:
+      description: Сессионная cookie `fm_session` (HttpOnly)
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Нужно войти
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Не найдено
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Конфликт с текущим состоянием
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TooManyRequests:
+      description: Слишком много попыток
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
   schemas:
     Health:
       type: object
@@ -42,6 +403,7 @@ components:
         version:
           type: string
           example: dev
+
     Error:
       type: object
       required: [code, message]
@@ -52,4 +414,160 @@ components:
           example: not_found
         message:
           type: string
-          description: Человекочитаемое сообщение
+          description: Человекочитаемое сообщение на русском
+        field:
+          type: string
+          description: Поле запроса, к которому относится ошибка валидации
+          example: email
+
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email:
+          type: string
+          maxLength: 254
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 50
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    User:
+      type: object
+      required: [id, displayName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        email:
+          type: string
+        avatarUrl:
+          type: string
+
+    Role:
+      type: string
+      enum: [owner, member]
+
+    HouseholdSummary:
+      type: object
+      required: [id, name, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+
+    Me:
+      type: object
+      required: [user, households]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        households:
+          type: array
+          items:
+            $ref: "#/components/schemas/HouseholdSummary"
+
+    HouseholdInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+
+    Member:
+      type: object
+      required: [userId, displayName, role, joinedAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        joinedAt:
+          type: string
+          format: date-time
+
+    HouseholdDetail:
+      type: object
+      required: [id, name, role, members]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+          description: Роль текущего пользователя
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/Member"
+
+    InviteInput:
+      type: object
+      properties:
+        maxUses:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 10
+        ttlHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+          default: 168
+
+    Invite:
+      type: object
+      required: [code, maxUses, uses, expiresAt, createdBy]
+      properties:
+        code:
+          type: string
+          example: K7QM-2XPA
+        maxUses:
+          type: integer
+        uses:
+          type: integer
+        expiresAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          description: Имя того, кто создал код
+
+    InvitePreview:
+      type: object
+      required: [householdName, invitedBy, memberCount]
+      properties:
+        householdName:
+          type: string
+        invitedBy:
+          type: string
+        memberCount:
+          type: integer

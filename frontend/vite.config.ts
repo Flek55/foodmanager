@@ -7,7 +7,12 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    // Explicit IPv4: with "localhost" Node on Windows may bind only to ::1,
+    // which some browsers/VPN clients don't reach. Fail instead of silently
+    // moving to another port if 5173 is taken.
+    host: "127.0.0.1",
     port: 5173,
+    strictPort: true,
     proxy: {
       "/api": "http://localhost:8080",
     },

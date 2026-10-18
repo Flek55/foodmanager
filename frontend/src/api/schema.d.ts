@@ -21,6 +21,217 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Регистрация по email и паролю */
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Вход по email и паролю */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Выход (закрывает текущую сессию) */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Текущий пользователь и его семьи */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/households": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Создать семью (создатель становится владельцем) */
+        post: operations["createHousehold"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/households/{householdId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+            };
+            cookie?: never;
+        };
+        /** Семья и её участники */
+        get: operations["getHousehold"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Переименовать семью (только владелец) */
+        patch: operations["updateHousehold"];
+        trace?: never;
+    };
+    "/households/{householdId}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+                userId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Исключить участника (владелец) или выйти из семьи (сам себя)
+         * @description Если выходит последний владелец, права владельца переходят к участнику,
+         *     который состоит в семье дольше всех. Если выходит последний человек,
+         *     семья удаляется вместе со всеми данными.
+         */
+        delete: operations["removeMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/households/{householdId}/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+            };
+            cookie?: never;
+        };
+        /** Действующие инвайт-коды семьи */
+        get: operations["listInvites"];
+        put?: never;
+        /** Создать инвайт-код (любой участник) */
+        post: operations["createInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/households/{householdId}/invites/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+                /** @description Код без учёта регистра, дефис необязателен */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Отозвать инвайт-код */
+        delete: operations["revokeInvite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Код без учёта регистра, дефис необязателен */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        /** Куда приглашает код (можно без входа) */
+        get: operations["previewInvite"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{code}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Код без учёта регистра, дефис необязателен */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Вступить в семью по коду */
+        post: operations["acceptInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -39,14 +250,150 @@ export interface components {
              * @example not_found
              */
             code: string;
-            /** @description Человекочитаемое сообщение */
+            /** @description Человекочитаемое сообщение на русском */
             message: string;
+            /**
+             * @description Поле запроса, к которому относится ошибка валидации
+             * @example email
+             */
+            field?: string;
+        };
+        RegisterRequest: {
+            email: string;
+            password: string;
+            displayName: string;
+        };
+        LoginRequest: {
+            email: string;
+            password: string;
+        };
+        User: {
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            email?: string;
+            avatarUrl?: string;
+        };
+        /** @enum {string} */
+        Role: "owner" | "member";
+        HouseholdSummary: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            role: components["schemas"]["Role"];
+        };
+        Me: {
+            user: components["schemas"]["User"];
+            households: components["schemas"]["HouseholdSummary"][];
+        };
+        HouseholdInput: {
+            name: string;
+        };
+        Member: {
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+            avatarUrl?: string;
+            role: components["schemas"]["Role"];
+            /** Format: date-time */
+            joinedAt: string;
+        };
+        HouseholdDetail: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Роль текущего пользователя */
+            role: components["schemas"]["Role"];
+            members: components["schemas"]["Member"][];
+        };
+        InviteInput: {
+            /** @default 10 */
+            maxUses?: number;
+            /** @default 168 */
+            ttlHours?: number;
+        };
+        Invite: {
+            /** @example K7QM-2XPA */
+            code: string;
+            maxUses: number;
+            uses: number;
+            /** Format: date-time */
+            expiresAt: string;
+            /** @description Имя того, кто создал код */
+            createdBy: string;
+        };
+        InvitePreview: {
+            householdName: string;
+            invitedBy: string;
+            memberCount: number;
         };
     };
-    responses: never;
-    parameters: never;
+    responses: {
+        /** @description Некорректный запрос */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Нужно войти */
+        Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Недостаточно прав */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Не найдено */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Конфликт с текущим состоянием */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Слишком много попыток */
+        TooManyRequests: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+    };
+    parameters: {
+        HouseholdId: string;
+        /** @description Код без учёта регистра, дефис необязателен */
+        InviteCode: string;
+    };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description Сессионная cookie `fm_session` (HttpOnly) */
+        SetSessionCookie: string;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -78,6 +425,335 @@ export interface operations {
                     "application/json": components["schemas"]["Health"];
                 };
             };
+        };
+    };
+    register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Аккаунт создан, сессия открыта */
+            201: {
+                headers: {
+                    "Set-Cookie": components["headers"]["SetSessionCookie"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Сессия открыта */
+            200: {
+                headers: {
+                    "Set-Cookie": components["headers"]["SetSessionCookie"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Сессия закрыта */
+            204: {
+                headers: {
+                    "Set-Cookie": components["headers"]["SetSessionCookie"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createHousehold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HouseholdInput"];
+            };
+        };
+        responses: {
+            /** @description Семья создана */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getHousehold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateHousehold: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HouseholdInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Участник удалён */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listInvites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invite"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["InviteInput"];
+            };
+        };
+        responses: {
+            /** @description Код создан */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invite"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    revokeInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: components["parameters"]["HouseholdId"];
+                /** @description Код без учёта регистра, дефис необязателен */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Код отозван */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    previewInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Код без учёта регистра, дефис необязателен */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitePreview"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    acceptInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Код без учёта регистра, дефис необязателен */
+                code: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Вы в семье (если уже были в ней, ничего не меняется) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
 }

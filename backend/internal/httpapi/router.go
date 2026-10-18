@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"foodmanager/internal/api"
+	"foodmanager/internal/apperr"
 )
 
 // NewRouter wires middleware, the generated API routes under /api and,
@@ -23,25 +24,36 @@ func NewRouter(h *Handler, log *slog.Logger, staticDir string) http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(requestLogger(log))
 	r.Use(middleware.Recoverer)
+	// Rejects cross-site state-changing requests (CSRF) using the
+	// Sec-Fetch-Site / Origin headers that all modern browsers send.
+	r.Use(http.NewCrossOriginProtection().Handler)
 
 	strict := api.NewStrictHandlerWithOptions(h, nil, api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
-			writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+			writeAppError(w, apperr.Invalid("", "некорректный запрос: "+err.Error()))
 		},
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			log.ErrorContext(r.Context(), "handler failed", "err", err, "path", r.URL.Path)
-			writeError(w, http.StatusInternalServerError, "internal", "внутренняя ошибка сервера")
+			if _, ok := apperr.As(err); !ok {
+				log.ErrorContext(r.Context(), "handler failed", "err", err, "path", r.URL.Path)
+			}
+			writeAppError(w, err)
 		},
 	})
 	api.HandlerWithOptions(strict, api.ChiServerOptions{
 		BaseURL:    "/api",
 		BaseRouter: r,
+		// Applied per API route; the LAST entry is the outermost, so the rate
+		// limiter runs before the session lookup hits the database.
+		Middlewares: []api.MiddlewareFunc{
+			sessionMiddleware(h.auth, h.cookies, log),
+			rateLimitSensitive(newIPLimiter(10, 10)),
+		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
-			writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+			writeAppError(w, apperr.Invalid("", "некорректный запрос: "+err.Error()))
 		},
 	})
 	r.HandleFunc("/api/*", func(w http.ResponseWriter, _ *http.Request) {
-		writeError(w, http.StatusNotFound, "not_found", "эндпоинт не найден")
+		writeAppError(w, apperr.NotFound("эндпоинт не найден"))
 	})
 
 	if staticDir != "" {
@@ -50,10 +62,36 @@ func NewRouter(h *Handler, log *slog.Logger, staticDir string) http.Handler {
 	return r
 }
 
-func writeError(w http.ResponseWriter, status int, code, message string) {
+// writeAppError maps domain errors to HTTP statuses; anything else is a 500
+// with a generic message (details go to the log, not to the client).
+func writeAppError(w http.ResponseWriter, err error) {
+	status := http.StatusInternalServerError
+	body := api.Error{Code: "internal", Message: "внутренняя ошибка сервера"}
+
+	if e, ok := apperr.As(err); ok {
+		switch e.Kind {
+		case apperr.KindInvalid:
+			status = http.StatusBadRequest
+		case apperr.KindUnauthorized:
+			status = http.StatusUnauthorized
+		case apperr.KindForbidden:
+			status = http.StatusForbidden
+		case apperr.KindNotFound:
+			status = http.StatusNotFound
+		case apperr.KindConflict:
+			status = http.StatusConflict
+		case apperr.KindTooManyRequests:
+			status = http.StatusTooManyRequests
+		}
+		body = api.Error{Code: e.Code, Message: e.Message}
+		if e.Field != "" {
+			body.Field = &e.Field
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(api.Error{Code: code, Message: message})
+	_ = json.NewEncoder(w).Encode(body)
 }
 
 // spaHandler serves files from dir and falls back to index.html for unknown

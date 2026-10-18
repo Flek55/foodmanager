@@ -12,9 +12,12 @@ import (
 	"syscall"
 	"time"
 
+	"foodmanager/internal/auth"
 	"foodmanager/internal/config"
 	"foodmanager/internal/db"
+	"foodmanager/internal/household"
 	"foodmanager/internal/httpapi"
+	"foodmanager/internal/store"
 )
 
 // version is set at build time: go build -ldflags "-X main.version=1.2.3".
@@ -48,9 +51,19 @@ func run() error {
 		return err
 	}
 
+	authSvc := auth.NewService(store.New(pool))
+	handler := httpapi.NewHandler(httpapi.Deps{
+		DB:           pool,
+		Auth:         authSvc,
+		Households:   household.NewService(pool),
+		SecureCookie: cfg.IsProd(),
+		Version:      version,
+	})
+	go purgeSessionsLoop(ctx, authSvc, log)
+
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewRouter(httpapi.NewHandler(pool, version), log, cfg.StaticDir),
+		Handler:           httpapi.NewRouter(handler, log, cfg.StaticDir),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -73,6 +86,24 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+func purgeSessionsLoop(ctx context.Context, svc *auth.Service, log *slog.Logger) {
+	t := time.NewTicker(time.Hour)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			n, err := svc.PurgeExpired(ctx)
+			if err != nil {
+				log.Error("purge expired sessions", "err", err)
+			} else if n > 0 {
+				log.Info("purged expired sessions", "count", n)
+			}
+		}
+	}
 }
 
 func newLogger(cfg config.Config) *slog.Logger {
