@@ -1,0 +1,26 @@
+# Local development infrastructure. The app itself runs natively
+# (go run / vite) for fast reloads; only Postgres lives in Docker.
+# Host port 5433 avoids clashing with a locally installed Postgres.
+name: foodmanager-dev
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: foodmanager
+      POSTGRES_PASSWORD: foodmanager
+      POSTGRES_DB: foodmanager
+    ports:
+      - "5433:5432"
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql/<major>/,
+      # so the volume is mounted one level up from the old .../data path.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foodmanager -d foodmanager"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:

@@ -1,0 +1,9 @@
+package: api
+output: api.gen.go
+generate:
+  models: true
+  chi-server: true
+  strict-server: true
+output-options:
+  # Keep shared schemas (e.g. Error) even before an endpoint references them.
+  skip-prune: true

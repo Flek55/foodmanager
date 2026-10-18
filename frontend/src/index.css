@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/*
+  Design tokens. Components use only these names (bg-surface, text-muted, …),
+  so the whole palette, including dark mode, is changed here in one place.
+*/
+@theme {
+  --color-bg: #f6f4ee;
+  --color-surface: #ffffff;
+  --color-ink: #1d1f1c;
+  --color-muted: #6b6f68;
+  --color-line: #e4e1d8;
+  --color-accent: #2f7d4f;
+  --color-accent-ink: #ffffff;
+  --color-warn: #c7731a;
+  --color-danger: #c2412d;
+
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius-card: 1.25rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #14161a;
+    --color-surface: #1d2025;
+    --color-ink: #eceae4;
+    --color-muted: #9a9d97;
+    --color-line: #2c3036;
+    --color-accent: #4fb87a;
+    --color-accent-ink: #0d1f14;
+    --color-warn: #e59a45;
+    --color-danger: #e5715c;
+  }
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}

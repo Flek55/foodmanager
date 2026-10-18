@@ -1,0 +1,89 @@
+package httpapi
+
+import (
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"foodmanager/internal/api"
+)
+
+// NewRouter wires middleware, the generated API routes under /api and,
+// optionally, the built SPA from staticDir.
+func NewRouter(h *Handler, log *slog.Logger, staticDir string) http.Handler {
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(requestLogger(log))
+	r.Use(middleware.Recoverer)
+
+	strict := api.NewStrictHandlerWithOptions(h, nil, api.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
+			writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		},
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			log.ErrorContext(r.Context(), "handler failed", "err", err, "path", r.URL.Path)
+			writeError(w, http.StatusInternalServerError, "internal", "внутренняя ошибка сервера")
+		},
+	})
+	api.HandlerWithOptions(strict, api.ChiServerOptions{
+		BaseURL:    "/api",
+		BaseRouter: r,
+		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
+			writeError(w, http.StatusBadRequest, "bad_request", err.Error())
+		},
+	})
+	r.HandleFunc("/api/*", func(w http.ResponseWriter, _ *http.Request) {
+		writeError(w, http.StatusNotFound, "not_found", "эндпоинт не найден")
+	})
+
+	if staticDir != "" {
+		r.Handle("/*", spaHandler(staticDir))
+	}
+	return r
+}
+
+func writeError(w http.ResponseWriter, status int, code, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(api.Error{Code: code, Message: message})
+}
+
+// spaHandler serves files from dir and falls back to index.html for unknown
+// paths, so client-side routes like /list/123 survive a page reload.
+func spaHandler(dir string) http.Handler {
+	files := http.FileServer(http.Dir(dir))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := filepath.Join(dir, filepath.FromSlash(strings.TrimPrefix(r.URL.Path, "/")))
+		if info, err := os.Stat(path); err != nil || info.IsDir() {
+			http.ServeFile(w, r, filepath.Join(dir, "index.html"))
+			return
+		}
+		files.ServeHTTP(w, r)
+	})
+}
+
+func requestLogger(log *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			next.ServeHTTP(ww, r)
+			log.InfoContext(r.Context(), "http request",
+				"method", r.Method,
+				"path", r.URL.Path,
+				"status", ww.Status(),
+				"bytes", ww.BytesWritten(),
+				"duration", time.Since(start),
+				"request_id", middleware.GetReqID(r.Context()),
+			)
+		})
+	}
+}
